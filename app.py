@@ -110,6 +110,24 @@ QUIZ_QUESTIONS = [
 
 QUIZ_FILE = "current_quiz.json"
 RESULTS_FILE = "quiz_results.json"
+AUTHORIZED_EMAILS_FILE = "authorized_emails.json"
+
+def load_authorized_emails():
+    if os.path.exists(AUTHORIZED_EMAILS_FILE):
+        try:
+            with open(AUTHORIZED_EMAILS_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_authorized_emails(emails):
+    try:
+        with open(AUTHORIZED_EMAILS_FILE, 'w') as f:
+            json.dump(emails, f)
+        return True
+    except:
+        return False
 
 def load_current_quiz():
     if os.path.exists(QUIZ_FILE):
@@ -310,87 +328,129 @@ def quiz_page():
 def admin_dashboard():
     st.header("👨💼 Admin Dashboard")
     
-    if 'last_refresh' not in st.session_state:
-        st.session_state.last_refresh = time.time()
+    tab1, tab2 = st.tabs(["📊 Student Status", "👥 Manage Students"])
     
-    st.subheader("📊 Student Status Grid (Auto-refreshing)")
-    
-    get_quiz_data.clear()
-    results_df = get_quiz_data()
-    
-    all_students = [email for email in st.session_state.authorized_emails if email != ADMIN_EMAIL]
-    
-    grid_data = []
-    for email in all_students:
-        student_result = results_df[results_df['Email'] == email] if not results_df.empty else pd.DataFrame()
+    with tab1:
+        if 'last_refresh' not in st.session_state:
+            st.session_state.last_refresh = time.time()
         
-        if not student_result.empty:
-            row = student_result.iloc[-1]
-            grid_data.append({
-                'Email': email,
-                'Status': '✅ Completed',
-                'Score': row['Quiz_Score'],
-                'Pass_Fail': row['Pass_Fail'],
-                'Timestamp': row['Timestamp']
-            })
-        else:
-            grid_data.append({
-                'Email': email,
-                'Status': '❌ Not Completed',
-                'Score': '-',
-                'Pass_Fail': '-',
-                'Timestamp': '-'
-            })
-    
-    grid_df = pd.DataFrame(grid_data)
-    
-    def highlight_status(row):
-        if row['Status'] == '✅ Completed':
-            if row['Pass_Fail'] == 'Pass':
-                return ['background-color: #d4edda'] * len(row)
+        st.subheader("📊 Student Status Grid (Auto-refreshing)")
+        
+        get_quiz_data.clear()
+        results_df = get_quiz_data()
+        
+        all_students = [email for email in st.session_state.authorized_emails if email != ADMIN_EMAIL]
+        
+        grid_data = []
+        for email in all_students:
+            student_result = results_df[results_df['Email'] == email] if not results_df.empty else pd.DataFrame()
+            
+            if not student_result.empty:
+                row = student_result.iloc[-1]
+                grid_data.append({
+                    'Email': email,
+                    'Status': '✅ Completed',
+                    'Score': row['Quiz_Score'],
+                    'Pass_Fail': row['Pass_Fail'],
+                    'Timestamp': row['Timestamp']
+                })
             else:
-                return ['background-color: #f8d7da'] * len(row)
-        else:
-            return ['background-color: #fff3cd'] * len(row)
+                grid_data.append({
+                    'Email': email,
+                    'Status': '❌ Not Completed',
+                    'Score': '-',
+                    'Pass_Fail': '-',
+                    'Timestamp': '-'
+                })
+        
+        grid_df = pd.DataFrame(grid_data)
+        
+        def highlight_status(row):
+            if row['Status'] == '✅ Completed':
+                if row['Pass_Fail'] == 'Pass':
+                    return ['background-color: #d4edda'] * len(row)
+                else:
+                    return ['background-color: #f8d7da'] * len(row)
+            else:
+                return ['background-color: #fff3cd'] * len(row)
+        
+        styled_grid = grid_df.style.apply(highlight_status, axis=1)
+        st.dataframe(styled_grid, width='stretch')
+        
+        completed = len([s for s in grid_data if s['Status'] == '✅ Completed'])
+        pending = len(all_students) - completed
+        pass_count = len([s for s in grid_data if s['Pass_Fail'] == 'Pass'])
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Students", len(all_students))
+        with col2:
+            st.metric("Completed", completed)
+        with col3:
+            st.metric("Pending", pending)
+        with col4:
+            st.metric("Pass Rate", f"{(pass_count/completed*100):.1f}%" if completed > 0 else "0%")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("🔄 Manual Refresh"):
+                st.rerun()
+        
+        with col2:
+            auto_refresh = st.checkbox("Auto-refresh (5s)", value=True)
+            if auto_refresh:
+                time.sleep(5)
+                st.rerun()
+        
+        with col3:
+            csv = grid_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Report CSV",
+                data=csv,
+                file_name=f"student_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+        
+        st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
     
-    styled_grid = grid_df.style.apply(highlight_status, axis=1)
-    st.dataframe(styled_grid, width='stretch')
-    
-    completed = len([s for s in grid_data if s['Status'] == '✅ Completed'])
-    pending = len(all_students) - completed
-    pass_count = len([s for s in grid_data if s['Pass_Fail'] == 'Pass'])
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Students", len(all_students))
-    with col2:
-        st.metric("Completed", completed)
-    with col3:
-        st.metric("Pending", pending)
-    with col4:
-        st.metric("Pass Rate", f"{(pass_count/completed*100):.1f}%" if completed > 0 else "0%")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("🔄 Manual Refresh"):
-            st.rerun()
-    
-    with col2:
-        auto_refresh = st.checkbox("Auto-refresh (5s)", value=True)
-        if auto_refresh:
-            time.sleep(5)
-            st.rerun()
-    
-    with col3:
-        csv = grid_df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Report CSV",
-            data=csv,
-            file_name=f"student_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
-    
-    st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
+    with tab2:
+        st.subheader("👥 Manage Authorized Students")
+        
+        st.write(f"**Total Students: {len([e for e in st.session_state.authorized_emails if e != ADMIN_EMAIL])}**")
+        
+        with st.form("add_student_form"):
+            new_email = st.text_input("Add New Student Email")
+            add_button = st.form_submit_button("➕ Add Student")
+            
+            if add_button and new_email:
+                if new_email in st.session_state.authorized_emails:
+                    st.error("Email already exists!")
+                elif '@' not in new_email:
+                    st.error("Invalid email format!")
+                else:
+                    st.session_state.authorized_emails.append(new_email)
+                    if save_authorized_emails(st.session_state.authorized_emails):
+                        st.success(f"Added {new_email} successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to save email")
+        
+        st.divider()
+        st.subheader("Current Students")
+        
+        students = [email for email in st.session_state.authorized_emails if email != ADMIN_EMAIL]
+        for email in students:
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.text(email)
+            with col2:
+                if st.button("🗑️", key=f"del_{email}"):
+                    st.session_state.authorized_emails.remove(email)
+                    if save_authorized_emails(st.session_state.authorized_emails):
+                        st.success(f"Removed {email}")
+                        st.rerun()
+                    else:
+                        st.error("Failed to remove email")
 
 def main():
     if 'logged_in' not in st.session_state:
@@ -398,6 +458,14 @@ def main():
     
     if 'quiz_results' not in st.session_state or not st.session_state.quiz_results:
         st.session_state.quiz_results = load_quiz_results()
+    
+    # Load authorized emails from file if exists, otherwise use default list
+    saved_emails = load_authorized_emails()
+    if saved_emails:
+        st.session_state.authorized_emails = saved_emails
+    elif 'authorized_emails' in st.session_state:
+        # Save current list to file for first time
+        save_authorized_emails(st.session_state.authorized_emails)
     
     if st.session_state.logged_in:
         st.sidebar.title("Navigation")
