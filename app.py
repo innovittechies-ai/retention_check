@@ -199,21 +199,29 @@ def login_page():
 
 def quiz_page():
     """Display quiz page"""
-    st.title("📝 Quiz Application")
-    st.write(f"Welcome, {st.session_state.user_email}!")
-    
-    # Option to generate quiz from transcript
-    st.header("Generate Custom Quiz")
-    api_key = st.text_input("Enter Google AI Studio API Key (optional):", type="password")
-    transcript = st.text_area("Paste transcript to generate custom quiz:", height=150)
-    
-    if st.button("Generate Custom Quiz") and api_key and transcript:
-        with st.spinner("Generating quiz..."):
-            custom_quiz = generate_quiz_with_gemini(transcript, api_key)
-            if custom_quiz:
-                st.session_state.current_quiz = custom_quiz['questions']
-                st.success("Custom quiz generated!")
-                st.rerun()
+    # Check if user is admin
+    if st.session_state.user_email == ADMIN_EMAIL:
+        st.title("📝 Quiz Application - Admin")
+        st.write(f"Welcome, {st.session_state.user_email}!")
+        
+        # Option to generate quiz from transcript (Admin only)
+        st.header("Generate Custom Quiz")
+        api_key = st.text_input("Enter Google AI Studio API Key (optional):", type="password")
+        transcript = st.text_area("Paste transcript to generate custom quiz:", height=150)
+        
+        if st.button("Generate Custom Quiz") and api_key and transcript:
+            with st.spinner("Generating quiz..."):
+                custom_quiz = generate_quiz_with_gemini(transcript, api_key)
+                if custom_quiz:
+                    st.session_state.current_quiz = custom_quiz['questions']
+                    st.success("Custom quiz generated!")
+                    st.rerun()
+        
+        st.divider()
+        st.info("💡 After generating a custom quiz, students will see the new questions when they take the quiz.")
+    else:
+        st.title("📝 Quiz")
+        st.write(f"Welcome, {st.session_state.user_email}!")
     
     # Use default quiz if no custom quiz
     if 'current_quiz' not in st.session_state:
