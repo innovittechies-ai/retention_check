@@ -5,12 +5,13 @@ import requests
 import json
 
 # Configuration
-AUTHORIZED_EMAILS = [
-    "user1@example.com",
-    "user2@example.com", 
-    "user3@example.com",
-    "admin@example.com"
-]
+if 'authorized_emails' not in st.session_state:
+    st.session_state.authorized_emails = [
+        "user1@example.com",
+        "user2@example.com", 
+        "user3@example.com",
+        "admin@example.com"
+    ]
 
 ADMIN_EMAIL = "admin@example.com"
 
@@ -158,7 +159,7 @@ def login_page():
         submit = st.form_submit_button("Login")
         
         if submit:
-            if email in AUTHORIZED_EMAILS and password:
+            if email in st.session_state.authorized_emails and password:
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
                 st.success("Login successful!")
@@ -237,11 +238,60 @@ def admin_dashboard():
     """Display admin dashboard"""
     st.header("👨💼 Admin Dashboard")
     
-    # Get quiz results data
+    # Email Management Section
+    st.subheader("📧 Email Management")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Current Authorized Emails:**")
+        for i, email in enumerate(st.session_state.authorized_emails):
+            if email != ADMIN_EMAIL:  # Don't allow removing admin
+                if st.button(f"❌ {email}", key=f"remove_{i}"):
+                    st.session_state.authorized_emails.remove(email)
+                    st.rerun()
+            else:
+                st.write(f"🔒 {email} (Admin)")
+    
+    with col2:
+        st.write("**Add New Email:**")
+        new_email = st.text_input("Enter email address:")
+        if st.button("➕ Add Email"):
+            if new_email and new_email not in st.session_state.authorized_emails:
+                st.session_state.authorized_emails.append(new_email)
+                st.success(f"Added {new_email}")
+                st.rerun()
+            elif new_email in st.session_state.authorized_emails:
+                st.warning("Email already exists")
+        
+        st.write("**Upload Email List:**")
+        uploaded_file = st.file_uploader("Upload CSV/TXT file with emails", type=['csv', 'txt'])
+        if uploaded_file:
+            try:
+                if uploaded_file.name.endswith('.csv'):
+                    df = pd.read_csv(uploaded_file)
+                    emails = df.iloc[:, 0].tolist()  # First column
+                else:
+                    emails = uploaded_file.read().decode('utf-8').strip().split('\n')
+                
+                new_emails = [email.strip() for email in emails if email.strip() and email.strip() not in st.session_state.authorized_emails]
+                
+                if new_emails:
+                    st.session_state.authorized_emails.extend(new_emails)
+                    st.success(f"Added {len(new_emails)} new emails")
+                    st.rerun()
+                else:
+                    st.info("No new emails to add")
+            except Exception as e:
+                st.error(f"Error processing file: {e}")
+    
+    st.divider()
+    
+    # Quiz Results Section
     df = get_quiz_data()
     
     if not df.empty:
-        st.subheader("Quiz Results")
+        st.subheader("📊 Quiz Results")
         st.dataframe(df)
         
         # Download button
@@ -254,12 +304,18 @@ def admin_dashboard():
         )
         
         # Statistics
-        st.subheader("Statistics")
+        st.subheader("📈 Statistics")
         if 'Pass_Fail' in df.columns:
             pass_count = len(df[df['Pass_Fail'] == 'Pass'])
             total_count = len(df)
-            st.metric("Pass Rate", f"{(pass_count/total_count*100):.1f}%" if total_count > 0 else "0%")
-            st.metric("Total Attempts", total_count)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Users", len(st.session_state.authorized_emails))
+            with col2:
+                st.metric("Total Attempts", total_count)
+            with col3:
+                st.metric("Pass Rate", f"{(pass_count/total_count*100):.1f}%" if total_count > 0 else "0%")
     else:
         st.info("No quiz results found.")
 
