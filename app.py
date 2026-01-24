@@ -453,6 +453,25 @@ def admin_dashboard():
                         st.error("Failed to remove email")
 
 def main():
+    # Page config with logo
+    st.set_page_config(
+        page_title="Quiz Application",
+        page_icon="📝",
+        layout="wide"
+    )
+    
+    # Custom CSS for logo in top left
+    st.markdown("""
+        <style>
+        [data-testid="stSidebarNav"] {
+            background-image: url('https://via.placeholder.com/150x50/4CAF50/FFFFFF?text=QUIZ+APP');
+            background-repeat: no-repeat;
+            background-position: 20px 20px;
+            padding-top: 80px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
     
@@ -468,22 +487,37 @@ def main():
         save_authorized_emails(st.session_state.authorized_emails)
     
     if st.session_state.logged_in:
-        st.sidebar.title("Navigation")
+        # Top bar with logo and user info
+        col1, col2, col3 = st.columns([1, 5, 1])
+        with col1:
+            if os.path.exists("Logo Full.png"):
+                st.image("Logo Full.png", width=150)
+        with col2:
+            st.markdown(f"### 📝 Quiz Application")
+        with col3:
+            st.markdown(f"**{st.session_state.user_email}**")
+            if st.button("🚪 Logout"):
+                st.session_state.logged_in = False
+                st.session_state.user_email = None
+                st.rerun()
         
-        if st.sidebar.button("Logout"):
-            st.session_state.logged_in = False
-            st.session_state.user_email = None
-            st.rerun()
+        st.divider()
         
         if st.session_state.user_email == ADMIN_EMAIL:
-            if st.sidebar.checkbox("Admin Mode"):
+            tab1, tab2 = st.tabs(["📝 Quiz Generation", "👨💼 Admin Dashboard"])
+            with tab1:
+                quiz_page()
+            with tab2:
                 admin_dashboard()
-                return
-    
-    if not st.session_state.logged_in:
-        login_page()
+        else:
+            quiz_page()
     else:
-        quiz_page()
+        # Show logo on login page
+        if os.path.exists("Logo Full.png"):
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.image("Logo Full.png", width=300)
+        login_page()
 
 if __name__ == "__main__":
     main()
