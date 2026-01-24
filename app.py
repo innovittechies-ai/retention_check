@@ -3,17 +3,41 @@ import requests
 import tempfile
 import os
 import json
-import whisper
+import base64
 
-@st.cache_resource
-def load_whisper_model():
-    return whisper.load_model("base")
-
-def transcribe_with_whisper(audio_file_path):
-    """Transcribe audio using Whisper"""
-    model = load_whisper_model()
-    result = model.transcribe(audio_file_path)
-    return result["text"]
+def transcribe_with_grok(audio_file_path, api_key):
+    """Try Grok transcription, fallback to manual input"""
+    try:
+        url = "https://api.x.ai/v1/chat/completions"
+        
+        # Read and encode audio file
+        with open(audio_file_path, 'rb') as audio_file:
+            audio_data = base64.b64encode(audio_file.read()).decode('utf-8')
+        
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        data = {
+            'model': 'grok-beta',
+            'messages': [{
+                'role': 'user', 
+                'content': 'Please transcribe this audio file to text.'
+            }],
+            'temperature': 0.1
+        }
+        
+        response = requests.post(url, headers=headers, json=data)
+        
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content']
+        else:
+            st.warning("Audio transcription not available. Please paste your transcript manually.")
+            return None
+    except Exception as e:
+        st.warning("Audio transcription not available. Please paste your transcript manually.")
+        return None
 
 def generate_quiz_with_grok(transcript, api_key):
     """Generate quiz using Grok API"""
@@ -73,21 +97,31 @@ def main():
         return
     
     # File upload
-    uploaded_file = st.file_uploader("Upload Audio File", type=['mp3', 'wav', 'm4a', 'mp4'])
+    uploaded_file = st.file_uploader("Upload Audio File (optional)", type=['mp3', 'wav', 'm4a', 'mp4'])
     
-    if uploaded_file and st.button("Generate Quiz"):
-        with st.spinner("Processing audio..."):
-            # Save uploaded file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
-                tmp_file.write(uploaded_file.read())
-                tmp_path = tmp_file.name
-            
-            # Transcribe
-            transcript = transcribe_with_whisper(tmp_path)
-            os.unlink(tmp_path)
-            
-            if not transcript:
-                return
+    # Manual transcript input
+    manual_transcript = st.text_area("Or paste your transcript here:", height=150)
+    
+    if st.button("Generate Quiz"):
+        transcript = None
+        
+        if uploaded_file:
+            with st.spinner("Processing audio..."):
+                # Save uploaded file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
+                    tmp_file.write(uploaded_file.read())
+                    tmp_path = tmp_file.name
+                
+                # Try transcription
+                transcript = transcribe_with_grok(tmp_path, api_key)
+                os.unlink(tmp_path)
+        
+        # Use manual transcript if audio transcription failed
+        if not transcript and manual_transcript:
+            transcript = manual_transcript
+        elif not transcript:
+            st.error("Please upload an audio file or paste a transcript")
+            return
             
             st.success("✅ Transcription complete!")
             with st.expander("View Transcript"):
