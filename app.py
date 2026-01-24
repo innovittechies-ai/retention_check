@@ -9,7 +9,7 @@ import time
 # Configuration
 if 'authorized_emails' not in st.session_state:
     st.session_state.authorized_emails = [
-        "admin@example.com",
+        "admin@admin.com",
         "anuradharandive04@gmail.com",
         "shafeekansari2002@gmail.com",
         "kotireddynarendrareddy@gmail.com",
@@ -39,7 +39,8 @@ if 'authorized_emails' not in st.session_state:
         "hemigipson@gmail.com"
     ]
 
-ADMIN_EMAIL = "admin@example.com"
+ADMIN_EMAIL = "admin@admin.com"
+ADMIN_PASSWORD = "6305732001"
 
 if 'quiz_results' not in st.session_state:
     st.session_state.quiz_results = []
@@ -228,7 +229,12 @@ def login_page():
         submit = st.form_submit_button("Login")
         
         if submit:
-            if email in st.session_state.authorized_emails and password:
+            if email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+                st.session_state.logged_in = True
+                st.session_state.user_email = email
+                st.success("Login successful!")
+                st.rerun()
+            elif email in st.session_state.authorized_emails and password:
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
                 st.success("Login successful!")
