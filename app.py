@@ -105,7 +105,7 @@ def save_quiz_result(email, score, pass_fail):
 
 def generate_quiz_with_gemini(transcript, api_key):
     """Generate quiz using Google Gemini API"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     prompt = f"""Based on this transcript, create exactly 10 multiple choice questions:
 - 5 easy questions (basic comprehension)
