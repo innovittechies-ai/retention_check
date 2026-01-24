@@ -103,9 +103,9 @@ def save_quiz_result(email, score, pass_fail):
         st.error(f"Error saving result: {e}")
         return False
 
-def generate_quiz_with_grok(transcript, api_key):
-    """Generate quiz using Grok API"""
-    url = "https://api.x.ai/v1/chat/completions"
+def generate_quiz_with_openai(transcript, api_key):
+    """Generate quiz using OpenAI API"""
+    url = "https://api.openai.com/v1/chat/completions"
     
     prompt = f"""Based on this transcript, create exactly 10 multiple choice questions:
 - 5 easy questions (basic comprehension)
@@ -131,7 +131,7 @@ Transcript: {transcript}"""
     }
     
     data = {
-        'model': 'grok-beta',
+        'model': 'gpt-3.5-turbo',
         'messages': [{'role': 'user', 'content': prompt}],
         'temperature': 0.7
     }
@@ -141,9 +141,14 @@ Transcript: {transcript}"""
     if response.status_code == 200:
         content = response.json()['choices'][0]['message']['content']
         try:
+            # Clean JSON if it has markdown formatting
+            if '```json' in content:
+                content = content.split('```json')[1].split('```')[0].strip()
+            elif '```' in content:
+                content = content.split('```')[1].strip()
             return json.loads(content)
-        except:
-            st.error("Failed to parse quiz JSON")
+        except Exception as e:
+            st.error(f"Failed to parse quiz JSON: {e}")
             return None
     else:
         st.error(f"Quiz generation failed: {response.text}")
@@ -174,12 +179,12 @@ def quiz_page():
     
     # Option to generate quiz from transcript
     st.header("Generate Custom Quiz")
-    api_key = st.text_input("Enter Grok API Key (optional):", type="password")
+    api_key = st.text_input("Enter OpenAI API Key (optional):", type="password")
     transcript = st.text_area("Paste transcript to generate custom quiz:", height=150)
     
     if st.button("Generate Custom Quiz") and api_key and transcript:
         with st.spinner("Generating quiz..."):
-            custom_quiz = generate_quiz_with_grok(transcript, api_key)
+            custom_quiz = generate_quiz_with_openai(transcript, api_key)
             if custom_quiz:
                 st.session_state.current_quiz = custom_quiz['questions']
                 st.success("Custom quiz generated!")
