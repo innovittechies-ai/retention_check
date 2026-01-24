@@ -9,22 +9,30 @@ from pydub import AudioSegment
 def transcribe_audio(audio_file_path):
     """Transcribe audio using Google Speech Recognition"""
     try:
-        # Convert audio to wav if needed
-        audio = AudioSegment.from_file(audio_file_path)
-        wav_path = audio_file_path.replace(os.path.splitext(audio_file_path)[1], '.wav')
-        audio.export(wav_path, format="wav")
-        
-        # Transcribe
         r = sr.Recognizer()
-        with sr.AudioFile(wav_path) as source:
-            audio_data = r.record(source)
-            text = r.recognize_google(audio_data)
         
-        # Clean up
-        if wav_path != audio_file_path:
-            os.unlink(wav_path)
+        # Try direct audio file first
+        try:
+            with sr.AudioFile(audio_file_path) as source:
+                audio_data = r.record(source)
+                text = r.recognize_google(audio_data)
+                return text
+        except:
+            # If direct doesn't work, convert to wav
+            audio = AudioSegment.from_file(audio_file_path)
+            wav_path = audio_file_path.replace(os.path.splitext(audio_file_path)[1], '.wav')
+            audio.export(wav_path, format="wav")
             
-        return text
+            with sr.AudioFile(wav_path) as source:
+                audio_data = r.record(source)
+                text = r.recognize_google(audio_data)
+            
+            # Clean up
+            if wav_path != audio_file_path:
+                os.unlink(wav_path)
+                
+            return text
+            
     except Exception as e:
         st.error(f"Transcription failed: {str(e)}")
         return None
@@ -112,10 +120,10 @@ def main():
         elif not transcript:
             st.error("Please upload an audio file or paste a transcript")
             return
-            
-            st.success("✅ Transcription complete!")
-            with st.expander("View Transcript"):
-                st.text_area("", transcript, height=150)
+        
+        st.success("✅ Transcription complete!")
+        with st.expander("View Transcript"):
+            st.text_area("", transcript, height=150)
         
         with st.spinner("Generating quiz..."):
             quiz_data = generate_quiz_with_grok(transcript, api_key)
