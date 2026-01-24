@@ -107,9 +107,28 @@ QUIZ_QUESTIONS = [
     }
 ]
 
-# Global quiz storage - shared across all users
-if 'global_quiz' not in st.session_state:
-    st.session_state.global_quiz = QUIZ_QUESTIONS
+# Global quiz storage - shared across all users using file system
+import os
+QUIZ_FILE = "current_quiz.json"
+
+def load_current_quiz():
+    """Load current quiz from file or return default"""
+    if os.path.exists(QUIZ_FILE):
+        try:
+            with open(QUIZ_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return QUIZ_QUESTIONS
+    return QUIZ_QUESTIONS
+
+def save_current_quiz(quiz_questions):
+    """Save current quiz to file"""
+    try:
+        with open(QUIZ_FILE, 'w') as f:
+            json.dump(quiz_questions, f)
+        return True
+    except:
+        return False
 
 @st.cache_data
 def get_quiz_data():
@@ -217,9 +236,11 @@ def quiz_page():
             with st.spinner("Generating quiz..."):
                 custom_quiz = generate_quiz_with_gemini(transcript, api_key)
                 if custom_quiz:
-                    st.session_state.global_quiz = custom_quiz['questions']
-                    st.success("Custom quiz generated! All students will now see this quiz.")
-                    st.rerun()
+                    if save_current_quiz(custom_quiz['questions']):
+                        st.success("Custom quiz generated! All students will now see this quiz.")
+                        st.rerun()
+                    else:
+                        st.error("Failed to save quiz")
         
         st.divider()
         st.info("💡 After generating a custom quiz, students will see the new questions when they take the quiz.")
@@ -227,8 +248,8 @@ def quiz_page():
         st.title("📝 Quiz")
         st.write(f"Welcome, {st.session_state.user_email}!")
     
-    # Use global quiz for all users
-    current_quiz = st.session_state.global_quiz
+    # Load current quiz (shared across all users)
+    current_quiz = load_current_quiz()
     
     st.header("Take Quiz")
     
