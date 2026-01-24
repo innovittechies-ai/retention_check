@@ -1,64 +1,112 @@
 import streamlit as st
+import pandas as pd
+from datetime import datetime
+from streamlit_gsheets import GSheetsConnection
 import requests
-import tempfile
-import os
 import json
-import speech_recognition as sr
-from pydub import AudioSegment
 
-def transcribe_audio(audio_file_path):
-    """Transcribe audio using Google Speech Recognition with chunking for large files"""
+# Configuration
+AUTHORIZED_EMAILS = [
+    "user1@example.com",
+    "user2@example.com", 
+    "user3@example.com",
+    "admin@example.com"
+]
+
+ADMIN_EMAIL = "admin@example.com"
+
+# Sample quiz questions
+QUIZ_QUESTIONS = [
+    {
+        "question": "What is the capital of France?",
+        "options": ["A) London", "B) Berlin", "C) Paris", "D) Madrid"],
+        "correct": "C",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Which programming language is known for data science?",
+        "options": ["A) Java", "B) Python", "C) C++", "D) JavaScript"],
+        "correct": "B",
+        "difficulty": "easy"
+    },
+    {
+        "question": "What does API stand for?",
+        "options": ["A) Application Programming Interface", "B) Advanced Programming Interface", "C) Automated Programming Interface", "D) Application Process Interface"],
+        "correct": "A",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Which company developed React?",
+        "options": ["A) Google", "B) Microsoft", "C) Facebook", "D) Amazon"],
+        "correct": "C",
+        "difficulty": "easy"
+    },
+    {
+        "question": "What is the time complexity of binary search?",
+        "options": ["A) O(n)", "B) O(log n)", "C) O(n²)", "D) O(1)"],
+        "correct": "B",
+        "difficulty": "easy"
+    },
+    {
+        "question": "In machine learning, what does overfitting mean?",
+        "options": ["A) Model performs well on training data but poorly on test data", "B) Model performs poorly on both training and test data", "C) Model performs well on both training and test data", "D) Model cannot be trained"],
+        "correct": "A",
+        "difficulty": "complex"
+    },
+    {
+        "question": "Which design pattern ensures a class has only one instance?",
+        "options": ["A) Factory", "B) Observer", "C) Singleton", "D) Strategy"],
+        "correct": "C",
+        "difficulty": "complex"
+    },
+    {
+        "question": "What is the main advantage of microservices architecture?",
+        "options": ["A) Easier debugging", "B) Better scalability and maintainability", "C) Faster development", "D) Lower costs"],
+        "correct": "B",
+        "difficulty": "complex"
+    },
+    {
+        "question": "In database normalization, what is the purpose of 3NF?",
+        "options": ["A) Remove duplicate data", "B) Eliminate transitive dependencies", "C) Create primary keys", "D) Improve query performance"],
+        "correct": "B",
+        "difficulty": "complex"
+    },
+    {
+        "question": "What is the CAP theorem in distributed systems?",
+        "options": ["A) Consistency, Availability, Partition tolerance", "B) Concurrency, Atomicity, Performance", "C) Caching, Authentication, Privacy", "D) Clustering, Aggregation, Partitioning"],
+        "correct": "A",
+        "difficulty": "complex"
+    }
+]
+
+@st.cache_data
+def get_gsheet_data():
+    """Get data from Google Sheets with caching"""
     try:
-        r = sr.Recognizer()
-        
-        # Convert to wav and split into chunks for large files
-        audio = AudioSegment.from_file(audio_file_path)
-        
-        # If audio is longer than 60 seconds, split into chunks
-        chunk_length_ms = 60000  # 60 seconds
-        chunks = []
-        
-        if len(audio) > chunk_length_ms:
-            st.info(f"Large audio file detected ({len(audio)//1000}s). Processing in chunks...")
-            for i in range(0, len(audio), chunk_length_ms):
-                chunk = audio[i:i + chunk_length_ms]
-                chunks.append(chunk)
-        else:
-            chunks = [audio]
-        
-        # Transcribe each chunk
-        full_transcript = []
-        
-        for i, chunk in enumerate(chunks):
-            try:
-                # Export chunk to temporary wav file
-                chunk_path = f"/tmp/chunk_{i}.wav"
-                chunk.export(chunk_path, format="wav")
-                
-                # Transcribe chunk
-                with sr.AudioFile(chunk_path) as source:
-                    audio_data = r.record(source)
-                    text = r.recognize_google(audio_data)
-                    full_transcript.append(text)
-                
-                # Clean up chunk file
-                os.unlink(chunk_path)
-                
-                if len(chunks) > 1:
-                    st.progress((i + 1) / len(chunks))
-                    
-            except Exception as e:
-                st.warning(f"Chunk {i+1} failed: {str(e)}")
-                continue
-        
-        if full_transcript:
-            return " ".join(full_transcript)
-        else:
-            return None
-            
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        df = conn.read()
+        return df
     except Exception as e:
-        st.error(f"Transcription failed: {str(e)}")
-        return None
+        st.error(f"Error connecting to Google Sheets: {e}")
+        return pd.DataFrame()
+
+def save_to_gsheet(email, score, pass_fail):
+    """Save quiz result to Google Sheets"""
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        
+        new_row = pd.DataFrame({
+            "Timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+            "Email": [email],
+            "Quiz_Score": [score],
+            "Pass_Fail": [pass_fail]
+        })
+        
+        conn.update(data=new_row, worksheet="Sheet1")
+        return True
+    except Exception as e:
+        st.error(f"Error saving to Google Sheets: {e}")
+        return False
 
 def generate_quiz_with_grok(transcript, api_key):
     """Generate quiz using Grok API"""
@@ -106,89 +154,149 @@ Transcript: {transcript}"""
         st.error(f"Quiz generation failed: {response.text}")
         return None
 
-def main():
-    st.title("🎧 Audio Quiz Generator")
-    st.write("Upload audio → Get transcript → Generate quiz")
+def login_page():
+    """Display login page"""
+    st.title("🔐 Quiz Login")
     
-    # API Key input
-    api_key = st.text_input("Enter your Grok API Key:", type="password")
-    
-    if not api_key:
-        st.warning("Please enter your Grok API key to continue")
-        return
-    
-    # File upload
-    uploaded_file = st.file_uploader("Upload Audio File (optional)", type=['mp3', 'wav', 'm4a', 'mp4'])
-    
-    # Manual transcript input
-    manual_transcript = st.text_area("Or paste your transcript here:", height=150)
-    
-    if st.button("Generate Quiz"):
-        transcript = None
+    with st.form("login_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        submit = st.form_submit_button("Login")
         
-        if uploaded_file:
-            with st.spinner("Processing audio..."):
-                # Save uploaded file
-                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
-                    tmp_file.write(uploaded_file.read())
-                    tmp_path = tmp_file.name
-                
-                # Transcribe audio
-                transcript = transcribe_audio(tmp_path)
-                os.unlink(tmp_path)
-        
-        # Use manual transcript if audio transcription failed
-        if not transcript and manual_transcript:
-            transcript = manual_transcript
-        elif not transcript:
-            st.error("Please upload an audio file or paste a transcript")
-            return
-        
-        st.success("✅ Transcription complete!")
-        with st.expander("View Transcript"):
-            st.text_area("Transcript", transcript, height=150)
-        
+        if submit:
+            if email in AUTHORIZED_EMAILS and password:  # Simple password check
+                st.session_state.logged_in = True
+                st.session_state.user_email = email
+                st.success("Login successful!")
+                st.rerun()
+            else:
+                st.error("Invalid email or password")
+
+def quiz_page():
+    """Display quiz page"""
+    st.title("📝 Quiz Application")
+    st.write(f"Welcome, {st.session_state.user_email}!")
+    
+    # Option to generate quiz from transcript
+    st.header("Generate Custom Quiz")
+    api_key = st.text_input("Enter Grok API Key (optional):", type="password")
+    transcript = st.text_area("Paste transcript to generate custom quiz:", height=150)
+    
+    if st.button("Generate Custom Quiz") and api_key and transcript:
         with st.spinner("Generating quiz..."):
-            quiz_data = generate_quiz_with_grok(transcript, api_key)
+            custom_quiz = generate_quiz_with_grok(transcript, api_key)
+            if custom_quiz:
+                st.session_state.current_quiz = custom_quiz['questions']
+                st.success("Custom quiz generated!")
+                st.rerun()
+    
+    # Use default quiz if no custom quiz
+    if 'current_quiz' not in st.session_state:
+        st.session_state.current_quiz = QUIZ_QUESTIONS
+    
+    st.header("Take Quiz")
+    
+    with st.form("quiz_form"):
+        user_answers = {}
+        
+        for i, q in enumerate(st.session_state.current_quiz):
+            st.subheader(f"Q{i+1} ({q['difficulty'].title()})")
+            st.write(q['question'])
             
-            if not quiz_data:
+            user_answers[i] = st.radio(
+                f"Select answer for Q{i+1}:",
+                q['options'],
+                key=f"q_{i}"
+            )
+        
+        submit_quiz = st.form_submit_button("Submit Quiz")
+        
+        if submit_quiz:
+            score = 0
+            results = []
+            
+            for i, q in enumerate(st.session_state.current_quiz):
+                correct = q['correct']
+                user_choice = user_answers[i][0]  # Get A, B, C, or D
+                
+                if user_choice == correct:
+                    score += 1
+                    results.append("✅")
+                else:
+                    results.append(f"❌ (Correct: {correct})")
+            
+            percentage = (score / len(st.session_state.current_quiz)) * 100
+            pass_fail = "Pass" if percentage >= 70 else "Fail"
+            
+            st.header("🎯 Results")
+            st.write(f"**Score: {score}/{len(st.session_state.current_quiz)} ({percentage:.1f}%)**")
+            st.write(f"**Status: {pass_fail}**")
+            
+            for i, result in enumerate(results):
+                st.write(f"Q{i+1}: {result}")
+            
+            # Save to Google Sheets
+            if save_to_gsheet(st.session_state.user_email, f"{score}/{len(st.session_state.current_quiz)}", pass_fail):
+                st.success("Results saved successfully!")
+
+def admin_dashboard():
+    """Display admin dashboard"""
+    st.header("👨‍💼 Admin Dashboard")
+    
+    # Get data from Google Sheets
+    df = get_gsheet_data()
+    
+    if not df.empty:
+        st.subheader("Quiz Results")
+        st.dataframe(df)
+        
+        # Download button
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Results as CSV",
+            data=csv,
+            file_name=f"quiz_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+        
+        # Statistics
+        st.subheader("Statistics")
+        if 'Pass_Fail' in df.columns:
+            pass_count = len(df[df['Pass_Fail'] == 'Pass'])
+            total_count = len(df)
+            st.metric("Pass Rate", f"{(pass_count/total_count*100):.1f}%" if total_count > 0 else "0%")
+            st.metric("Total Attempts", total_count)
+    else:
+        st.info("No quiz results found.")
+
+def main():
+    """Main application"""
+    # Initialize session state
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+    
+    # Sidebar
+    if st.session_state.logged_in:
+        st.sidebar.title("Navigation")
+        
+        if st.sidebar.button("Logout"):
+            st.session_state.logged_in = False
+            st.session_state.user_email = None
+            if 'current_quiz' in st.session_state:
+                del st.session_state.current_quiz
+            st.rerun()
+        
+        # Admin mode
+        if st.session_state.user_email == ADMIN_EMAIL:
+            if st.sidebar.checkbox("Admin Mode"):
+                admin_dashboard()
                 return
-            
-            st.success("✅ Quiz generated!")
-            
-            # Display quiz
-            st.header("📝 Quiz")
-            
-            user_answers = {}
-            for i, q in enumerate(quiz_data['questions']):
-                st.subheader(f"Q{i+1} ({q['difficulty'].title()})")
-                st.write(q['question'])
-                
-                user_answers[i] = st.radio(
-                    f"Select answer for Q{i+1}:",
-                    q['options'],
-                    key=f"q_{i}"
-                )
-            
-            if st.button("Submit Quiz"):
-                score = 0
-                results = []
-                
-                for i, q in enumerate(quiz_data['questions']):
-                    correct = q['correct']
-                    user_choice = user_answers[i][0]  # Get A, B, C, or D
-                    
-                    if user_choice == correct:
-                        score += 1
-                        results.append("✅")
-                    else:
-                        results.append(f"❌ (Correct: {correct})")
-                
-                st.header("🎯 Results")
-                st.write(f"**Score: {score}/10 ({score*10}%)**")
-                
-                for i, result in enumerate(results):
-                    st.write(f"Q{i+1}: {result}")
+    
+    # Main content
+    if not st.session_state.logged_in:
+        login_page()
+    else:
+        quiz_page()
 
 if __name__ == "__main__":
     main()
