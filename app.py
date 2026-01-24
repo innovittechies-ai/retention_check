@@ -7,31 +7,54 @@ import speech_recognition as sr
 from pydub import AudioSegment
 
 def transcribe_audio(audio_file_path):
-    """Transcribe audio using Google Speech Recognition"""
+    """Transcribe audio using Google Speech Recognition with chunking for large files"""
     try:
         r = sr.Recognizer()
         
-        # Try direct audio file first
-        try:
-            with sr.AudioFile(audio_file_path) as source:
-                audio_data = r.record(source)
-                text = r.recognize_google(audio_data)
-                return text
-        except:
-            # If direct doesn't work, convert to wav
-            audio = AudioSegment.from_file(audio_file_path)
-            wav_path = audio_file_path.replace(os.path.splitext(audio_file_path)[1], '.wav')
-            audio.export(wav_path, format="wav")
-            
-            with sr.AudioFile(wav_path) as source:
-                audio_data = r.record(source)
-                text = r.recognize_google(audio_data)
-            
-            # Clean up
-            if wav_path != audio_file_path:
-                os.unlink(wav_path)
+        # Convert to wav and split into chunks for large files
+        audio = AudioSegment.from_file(audio_file_path)
+        
+        # If audio is longer than 60 seconds, split into chunks
+        chunk_length_ms = 60000  # 60 seconds
+        chunks = []
+        
+        if len(audio) > chunk_length_ms:
+            st.info(f"Large audio file detected ({len(audio)//1000}s). Processing in chunks...")
+            for i in range(0, len(audio), chunk_length_ms):
+                chunk = audio[i:i + chunk_length_ms]
+                chunks.append(chunk)
+        else:
+            chunks = [audio]
+        
+        # Transcribe each chunk
+        full_transcript = []
+        
+        for i, chunk in enumerate(chunks):
+            try:
+                # Export chunk to temporary wav file
+                chunk_path = f"/tmp/chunk_{i}.wav"
+                chunk.export(chunk_path, format="wav")
                 
-            return text
+                # Transcribe chunk
+                with sr.AudioFile(chunk_path) as source:
+                    audio_data = r.record(source)
+                    text = r.recognize_google(audio_data)
+                    full_transcript.append(text)
+                
+                # Clean up chunk file
+                os.unlink(chunk_path)
+                
+                if len(chunks) > 1:
+                    st.progress((i + 1) / len(chunks))
+                    
+            except Exception as e:
+                st.warning(f"Chunk {i+1} failed: {str(e)}")
+                continue
+        
+        if full_transcript:
+            return " ".join(full_transcript)
+        else:
+            return None
             
     except Exception as e:
         st.error(f"Transcription failed: {str(e)}")
@@ -123,7 +146,7 @@ def main():
         
         st.success("✅ Transcription complete!")
         with st.expander("View Transcript"):
-            st.text_area("", transcript, height=150)
+            st.text_area("Transcript", transcript, height=150)
         
         with st.spinner("Generating quiz..."):
             quiz_data = generate_quiz_with_grok(transcript, api_key)
