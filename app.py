@@ -7,10 +7,34 @@ import json
 # Configuration
 if 'authorized_emails' not in st.session_state:
     st.session_state.authorized_emails = [
-        "user1@example.com",
-        "user2@example.com", 
-        "user3@example.com",
-        "admin@example.com"
+        "admin@example.com",
+        "anuradharandive04@gmail.com",
+        "shafeekansari2002@gmail.com",
+        "kotireddynarendrareddy@gmail.com",
+        "cheeravinaykumar94@gmail.com",
+        "abinash.kar.november18@gmail.com",
+        "ashfakhshaikh7@gmail.com",
+        "vattesandeep28@gmail.com",
+        "akhima.shaik2003@gmail.com",
+        "shivakumar0752@gmail.com",
+        "praveenbhatlu7@gmail.com",
+        "apurvachavan306@gmail.com",
+        "rakeshpandeeti@gmail.com",
+        "itsmrmanu@gmail.com",
+        "bhanusri1177@gmail.com",
+        "mkrout997@gmail.com",
+        "sowmyavreddy12@gmail.com",
+        "chidrawarsanjana9@gmail.com",
+        "mayuri.shah715@gmail.com",
+        "prasanthchowdary789@gmail.com",
+        "sanjaikumar1202@gmail.com",
+        "shreyas.phansalkar2017@gmail.com",
+        "hksamreen0@gmail.com",
+        "sahilmutha230901@gmail.com",
+        "ankitamarathe25@gmail.com",
+        "tsananse0298@gmail.com",
+        "umakondaru@gmail.com",
+        "hemigipson@gmail.com"
     ]
 
 ADMIN_EMAIL = "admin@example.com"
