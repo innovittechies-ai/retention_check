@@ -300,6 +300,89 @@ def admin_dashboard():
     """Display admin dashboard"""
     st.header("👨💼 Admin Dashboard")
     
+    # Real-time Quiz Monitoring
+    st.subheader("📈 Live Quiz Results")
+    
+    df = get_quiz_data()
+    
+    if not df.empty:
+        # Summary metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        total_students = len(st.session_state.authorized_emails) - 1  # Exclude admin
+        attempted = len(df)
+        pending = total_students - attempted
+        pass_count = len(df[df['Pass_Fail'] == 'Pass']) if 'Pass_Fail' in df.columns else 0
+        
+        with col1:
+            st.metric("👥 Total Students", total_students)
+        with col2:
+            st.metric("✅ Attempted", attempted, delta=f"{(attempted/total_students*100):.1f}%")
+        with col3:
+            st.metric("⏳ Pending", pending)
+        with col4:
+            st.metric("🎯 Pass Rate", f"{(pass_count/attempted*100):.1f}%" if attempted > 0 else "0%")
+        
+        # Live results table with color coding
+        st.subheader("📋 Results Table")
+        
+        # Add status colors
+        def highlight_results(row):
+            if row['Pass_Fail'] == 'Pass':
+                return ['background-color: #d4edda'] * len(row)
+            else:
+                return ['background-color: #f8d7da'] * len(row)
+        
+        styled_df = df.style.apply(highlight_results, axis=1)
+        st.dataframe(styled_df, use_container_width=True)
+        
+        # Pending students list
+        if pending > 0:
+            st.subheader("⚠️ Pending Students")
+            attempted_emails = df['Email'].tolist() if 'Email' in df.columns else []
+            pending_emails = [email for email in st.session_state.authorized_emails 
+                            if email != ADMIN_EMAIL and email not in attempted_emails]
+            
+            for email in pending_emails:
+                st.write(f"🔴 {email}")
+        
+        # Auto-refresh option
+        if st.button("🔄 Refresh Results"):
+            st.rerun()
+        
+        # Download options
+        st.subheader("📥 Export Options")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="📄 Download Complete Results",
+                data=csv,
+                file_name=f"quiz_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+        
+        with col2:
+            # Summary report
+            summary_data = {
+                'Metric': ['Total Students', 'Attempted', 'Pending', 'Pass Count', 'Fail Count', 'Pass Rate'],
+                'Value': [total_students, attempted, pending, pass_count, attempted-pass_count, f"{(pass_count/attempted*100):.1f}%" if attempted > 0 else "0%"]
+            }
+            summary_df = pd.DataFrame(summary_data)
+            summary_csv = summary_df.to_csv(index=False)
+            st.download_button(
+                label="📊 Download Summary Report",
+                data=summary_csv,
+                file_name=f"quiz_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+    else:
+        st.info("📋 No quiz attempts yet. Results will appear here as students complete the quiz.")
+        st.write(f"👥 **{len(st.session_state.authorized_emails) - 1} students** are authorized to take the quiz.")
+    
+    st.divider()
+    
     # Email Management Section
     st.subheader("📧 Email Management")
     
@@ -331,8 +414,8 @@ def admin_dashboard():
         if uploaded_file:
             try:
                 if uploaded_file.name.endswith('.csv'):
-                    df = pd.read_csv(uploaded_file)
-                    emails = df.iloc[:, 0].tolist()  # First column
+                    df_emails = pd.read_csv(uploaded_file)
+                    emails = df_emails.iloc[:, 0].tolist()  # First column
                 else:
                     emails = uploaded_file.read().decode('utf-8').strip().split('\n')
                 
@@ -346,40 +429,6 @@ def admin_dashboard():
                     st.info("No new emails to add")
             except Exception as e:
                 st.error(f"Error processing file: {e}")
-    
-    st.divider()
-    
-    # Quiz Results Section
-    df = get_quiz_data()
-    
-    if not df.empty:
-        st.subheader("📊 Quiz Results")
-        st.dataframe(df)
-        
-        # Download button
-        csv = df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Results as CSV",
-            data=csv,
-            file_name=f"quiz_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
-        
-        # Statistics
-        st.subheader("📈 Statistics")
-        if 'Pass_Fail' in df.columns:
-            pass_count = len(df[df['Pass_Fail'] == 'Pass'])
-            total_count = len(df)
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Users", len(st.session_state.authorized_emails))
-            with col2:
-                st.metric("Total Attempts", total_count)
-            with col3:
-                st.metric("Pass Rate", f"{(pass_count/total_count*100):.1f}%" if total_count > 0 else "0%")
-    else:
-        st.info("No quiz results found.")
 
 def main():
     """Main application"""
