@@ -3,23 +3,17 @@ import requests
 import tempfile
 import os
 import json
+import whisper
 
-def transcribe_with_grok(audio_file_path, api_key):
-    """Transcribe audio using Grok API"""
-    url = "https://api.x.ai/v1/audio/transcriptions"
-    
-    with open(audio_file_path, 'rb') as audio_file:
-        files = {'file': audio_file}
-        data = {'model': 'whisper-1'}
-        headers = {'Authorization': f'Bearer {api_key}'}
-        
-        response = requests.post(url, files=files, data=data, headers=headers)
-        
-        if response.status_code == 200:
-            return response.json()['text']
-        else:
-            st.error(f"Transcription failed: {response.text}")
-            return None
+@st.cache_resource
+def load_whisper_model():
+    return whisper.load_model("base")
+
+def transcribe_with_whisper(audio_file_path):
+    """Transcribe audio using Whisper"""
+    model = load_whisper_model()
+    result = model.transcribe(audio_file_path)
+    return result["text"]
 
 def generate_quiz_with_grok(transcript, api_key):
     """Generate quiz using Grok API"""
@@ -89,7 +83,7 @@ def main():
                 tmp_path = tmp_file.name
             
             # Transcribe
-            transcript = transcribe_with_grok(tmp_path, api_key)
+            transcript = transcribe_with_whisper(tmp_path)
             os.unlink(tmp_path)
             
             if not transcript:
