@@ -107,6 +107,10 @@ QUIZ_QUESTIONS = [
     }
 ]
 
+# Global quiz storage - shared across all users
+if 'global_quiz' not in st.session_state:
+    st.session_state.global_quiz = QUIZ_QUESTIONS
+
 @st.cache_data
 def get_quiz_data():
     """Get quiz results data"""
@@ -213,8 +217,8 @@ def quiz_page():
             with st.spinner("Generating quiz..."):
                 custom_quiz = generate_quiz_with_gemini(transcript, api_key)
                 if custom_quiz:
-                    st.session_state.current_quiz = custom_quiz['questions']
-                    st.success("Custom quiz generated!")
+                    st.session_state.global_quiz = custom_quiz['questions']
+                    st.success("Custom quiz generated! All students will now see this quiz.")
                     st.rerun()
         
         st.divider()
@@ -223,16 +227,15 @@ def quiz_page():
         st.title("📝 Quiz")
         st.write(f"Welcome, {st.session_state.user_email}!")
     
-    # Use default quiz if no custom quiz
-    if 'current_quiz' not in st.session_state:
-        st.session_state.current_quiz = QUIZ_QUESTIONS
+    # Use global quiz for all users
+    current_quiz = st.session_state.global_quiz
     
     st.header("Take Quiz")
     
     with st.form("quiz_form"):
         user_answers = {}
         
-        for i, q in enumerate(st.session_state.current_quiz):
+        for i, q in enumerate(current_quiz):
             st.subheader(f"Q{i+1} ({q['difficulty'].title()})")
             st.write(q['question'])
             
@@ -248,7 +251,7 @@ def quiz_page():
             score = 0
             results = []
             
-            for i, q in enumerate(st.session_state.current_quiz):
+            for i, q in enumerate(current_quiz):
                 correct = q['correct']
                 user_choice = user_answers[i][0]
                 
@@ -258,18 +261,18 @@ def quiz_page():
                 else:
                     results.append(f"❌ (Correct: {correct})")
             
-            percentage = (score / len(st.session_state.current_quiz)) * 100
+            percentage = (score / len(current_quiz)) * 100
             pass_fail = "Pass" if percentage >= 70 else "Fail"
             
             st.header("🎯 Results")
-            st.write(f"**Score: {score}/{len(st.session_state.current_quiz)} ({percentage:.1f}%)**")
+            st.write(f"**Score: {score}/{len(current_quiz)} ({percentage:.1f}%)**")
             st.write(f"**Status: {pass_fail}**")
             
             for i, result in enumerate(results):
                 st.write(f"Q{i+1}: {result}")
             
             # Save results
-            if save_quiz_result(st.session_state.user_email, f"{score}/{len(st.session_state.current_quiz)}", pass_fail):
+            if save_quiz_result(st.session_state.user_email, f"{score}/{len(current_quiz)}", pass_fail):
                 st.success("Results saved successfully!")
 
 def admin_dashboard():
@@ -370,8 +373,6 @@ def main():
         if st.sidebar.button("Logout"):
             st.session_state.logged_in = False
             st.session_state.user_email = None
-            if 'current_quiz' in st.session_state:
-                del st.session_state.current_quiz
             st.rerun()
         
         # Admin mode
