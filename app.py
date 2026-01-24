@@ -103,9 +103,9 @@ def save_quiz_result(email, score, pass_fail):
         st.error(f"Error saving result: {e}")
         return False
 
-def generate_quiz_with_openai(transcript, api_key):
-    """Generate quiz using OpenAI API"""
-    url = "https://api.openai.com/v1/chat/completions"
+def generate_quiz_with_gemini(transcript, api_key):
+    """Generate quiz using Google Gemini API"""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
     
     prompt = f"""Based on this transcript, create exactly 10 multiple choice questions:
 - 5 easy questions (basic comprehension)
@@ -126,21 +126,22 @@ Format as JSON:
 Transcript: {transcript}"""
 
     headers = {
-        'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json'
     }
     
     data = {
-        'model': 'gpt-3.5-turbo',
-        'messages': [{'role': 'user', 'content': prompt}],
-        'temperature': 0.7
+        "contents": [{
+            "parts": [{
+                "text": prompt
+            }]
+        }]
     }
     
     response = requests.post(url, headers=headers, json=data)
     
     if response.status_code == 200:
-        content = response.json()['choices'][0]['message']['content']
         try:
+            content = response.json()['candidates'][0]['content']['parts'][0]['text']
             # Clean JSON if it has markdown formatting
             if '```json' in content:
                 content = content.split('```json')[1].split('```')[0].strip()
@@ -179,12 +180,12 @@ def quiz_page():
     
     # Option to generate quiz from transcript
     st.header("Generate Custom Quiz")
-    api_key = st.text_input("Enter OpenAI API Key (optional):", type="password")
+    api_key = st.text_input("Enter Google AI Studio API Key (optional):", type="password")
     transcript = st.text_area("Paste transcript to generate custom quiz:", height=150)
     
     if st.button("Generate Custom Quiz") and api_key and transcript:
         with st.spinner("Generating quiz..."):
-            custom_quiz = generate_quiz_with_openai(transcript, api_key)
+            custom_quiz = generate_quiz_with_gemini(transcript, api_key)
             if custom_quiz:
                 st.session_state.current_quiz = custom_quiz['questions']
                 st.success("Custom quiz generated!")
