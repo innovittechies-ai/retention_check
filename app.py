@@ -326,11 +326,11 @@ def quiz_page():
                 st.success("Results saved successfully!")
 
 def admin_dashboard():
-    st.header("👨💼 Admin Dashboard")
-    
     tab1, tab2 = st.tabs(["📊 Student Status", "👥 Manage Students"])
     
     with tab1:
+        st.header("👨💼 Admin Dashboard")
+        
         if 'last_refresh' not in st.session_state:
             st.session_state.last_refresh = time.time()
         
@@ -414,7 +414,7 @@ def admin_dashboard():
         st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
     
     with tab2:
-        st.subheader("👥 Manage Authorized Students")
+        st.header("👥 Manage Authorized Students")
         
         st.write(f"**Total Students: {len([e for e in st.session_state.authorized_emails if e != ADMIN_EMAIL])}**")
         
