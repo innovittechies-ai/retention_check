@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
 import requests
 import json
 
@@ -14,6 +13,10 @@ AUTHORIZED_EMAILS = [
 ]
 
 ADMIN_EMAIL = "admin@example.com"
+
+# In-memory storage (replace with Google Sheets in production)
+if 'quiz_results' not in st.session_state:
+    st.session_state.quiz_results = []
 
 # Sample quiz questions
 QUIZ_QUESTIONS = [
@@ -80,32 +83,23 @@ QUIZ_QUESTIONS = [
 ]
 
 @st.cache_data
-def get_gsheet_data():
-    """Get data from Google Sheets with caching"""
-    try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        df = conn.read()
-        return df
-    except Exception as e:
-        st.error(f"Error connecting to Google Sheets: {e}")
-        return pd.DataFrame()
+def get_quiz_data():
+    """Get quiz results data"""
+    return pd.DataFrame(st.session_state.quiz_results)
 
-def save_to_gsheet(email, score, pass_fail):
-    """Save quiz result to Google Sheets"""
+def save_quiz_result(email, score, pass_fail):
+    """Save quiz result"""
     try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        
-        new_row = pd.DataFrame({
-            "Timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-            "Email": [email],
-            "Quiz_Score": [score],
-            "Pass_Fail": [pass_fail]
-        })
-        
-        conn.update(data=new_row, worksheet="Sheet1")
+        result = {
+            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Email": email,
+            "Quiz_Score": score,
+            "Pass_Fail": pass_fail
+        }
+        st.session_state.quiz_results.append(result)
         return True
     except Exception as e:
-        st.error(f"Error saving to Google Sheets: {e}")
+        st.error(f"Error saving result: {e}")
         return False
 
 def generate_quiz_with_grok(transcript, api_key):
@@ -164,7 +158,7 @@ def login_page():
         submit = st.form_submit_button("Login")
         
         if submit:
-            if email in AUTHORIZED_EMAILS and password:  # Simple password check
+            if email in AUTHORIZED_EMAILS and password:
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
                 st.success("Login successful!")
@@ -217,7 +211,7 @@ def quiz_page():
             
             for i, q in enumerate(st.session_state.current_quiz):
                 correct = q['correct']
-                user_choice = user_answers[i][0]  # Get A, B, C, or D
+                user_choice = user_answers[i][0]
                 
                 if user_choice == correct:
                     score += 1
@@ -235,16 +229,16 @@ def quiz_page():
             for i, result in enumerate(results):
                 st.write(f"Q{i+1}: {result}")
             
-            # Save to Google Sheets
-            if save_to_gsheet(st.session_state.user_email, f"{score}/{len(st.session_state.current_quiz)}", pass_fail):
+            # Save results
+            if save_quiz_result(st.session_state.user_email, f"{score}/{len(st.session_state.current_quiz)}", pass_fail):
                 st.success("Results saved successfully!")
 
 def admin_dashboard():
     """Display admin dashboard"""
-    st.header("👨‍💼 Admin Dashboard")
+    st.header("👨💼 Admin Dashboard")
     
-    # Get data from Google Sheets
-    df = get_gsheet_data()
+    # Get quiz results data
+    df = get_quiz_data()
     
     if not df.empty:
         st.subheader("Quiz Results")
