@@ -300,135 +300,101 @@ def admin_dashboard():
     """Display admin dashboard"""
     st.header("👨💼 Admin Dashboard")
     
-    # Real-time Quiz Monitoring
-    st.subheader("📈 Live Quiz Results")
+    # Auto-refresh every 5 seconds
+    import time
+    if 'last_refresh' not in st.session_state:
+        st.session_state.last_refresh = time.time()
     
-    df = get_quiz_data()
+    # Student Status Grid
+    st.subheader("📊 Student Status Grid (Auto-refreshing)")
     
-    if not df.empty:
-        # Summary metrics
-        col1, col2, col3, col4 = st.columns(4)
+    # Get quiz results (clear cache to get fresh data)
+    get_quiz_data.clear()
+    results_df = get_quiz_data()
+    
+    # Create complete student grid
+    all_students = [email for email in st.session_state.authorized_emails if email != ADMIN_EMAIL]
+    
+    grid_data = []
+    for email in all_students:
+        # Check if student has completed quiz
+        student_result = results_df[results_df['Email'] == email] if not results_df.empty else pd.DataFrame()
         
-        total_students = len(st.session_state.authorized_emails) - 1  # Exclude admin
-        attempted = len(df)
-        pending = total_students - attempted
-        pass_count = len(df[df['Pass_Fail'] == 'Pass']) if 'Pass_Fail' in df.columns else 0
-        
-        with col1:
-            st.metric("👥 Total Students", total_students)
-        with col2:
-            st.metric("✅ Attempted", attempted, delta=f"{(attempted/total_students*100):.1f}%")
-        with col3:
-            st.metric("⏳ Pending", pending)
-        with col4:
-            st.metric("🎯 Pass Rate", f"{(pass_count/attempted*100):.1f}%" if attempted > 0 else "0%")
-        
-        # Live results table with color coding
-        st.subheader("📋 Results Table")
-        
-        # Add status colors
-        def highlight_results(row):
+        if not student_result.empty:
+            # Student completed quiz
+            row = student_result.iloc[-1]  # Get latest attempt
+            grid_data.append({
+                'Email': email,
+                'Status': '✅ Completed',
+                'Score': row['Quiz_Score'],
+                'Pass_Fail': row['Pass_Fail'],
+                'Timestamp': row['Timestamp']
+            })
+        else:
+            # Student hasn't completed quiz
+            grid_data.append({
+                'Email': email,
+                'Status': '❌ Not Completed',
+                'Score': '-',
+                'Pass_Fail': '-',
+                'Timestamp': '-'
+            })
+    
+    # Create and display grid
+    grid_df = pd.DataFrame(grid_data)
+    
+    # Color coding function
+    def highlight_status(row):
+        if row['Status'] == '✅ Completed':
             if row['Pass_Fail'] == 'Pass':
-                return ['background-color: #d4edda'] * len(row)
+                return ['background-color: #d4edda'] * len(row)  # Light green
             else:
-                return ['background-color: #f8d7da'] * len(row)
-        
-        styled_df = df.style.apply(highlight_results, axis=1)
-        st.dataframe(styled_df, use_container_width=True)
-        
-        # Pending students list
-        if pending > 0:
-            st.subheader("⚠️ Pending Students")
-            attempted_emails = df['Email'].tolist() if 'Email' in df.columns else []
-            pending_emails = [email for email in st.session_state.authorized_emails 
-                            if email != ADMIN_EMAIL and email not in attempted_emails]
-            
-            for email in pending_emails:
-                st.write(f"🔴 {email}")
-        
-        # Auto-refresh option
-        if st.button("🔄 Refresh Results"):
-            st.rerun()
-        
-        # Download options
-        st.subheader("📥 Export Options")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            csv = df.to_csv(index=False)
-            st.download_button(
-                label="📄 Download Complete Results",
-                data=csv,
-                file_name=f"quiz_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
-        
-        with col2:
-            # Summary report
-            summary_data = {
-                'Metric': ['Total Students', 'Attempted', 'Pending', 'Pass Count', 'Fail Count', 'Pass Rate'],
-                'Value': [total_students, attempted, pending, pass_count, attempted-pass_count, f"{(pass_count/attempted*100):.1f}%" if attempted > 0 else "0%"]
-            }
-            summary_df = pd.DataFrame(summary_data)
-            summary_csv = summary_df.to_csv(index=False)
-            st.download_button(
-                label="📊 Download Summary Report",
-                data=summary_csv,
-                file_name=f"quiz_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
-    else:
-        st.info("📋 No quiz attempts yet. Results will appear here as students complete the quiz.")
-        st.write(f"👥 **{len(st.session_state.authorized_emails) - 1} students** are authorized to take the quiz.")
+                return ['background-color: #f8d7da'] * len(row)  # Light red
+        else:
+            return ['background-color: #fff3cd'] * len(row)  # Light yellow
     
-    st.divider()
+    styled_grid = grid_df.style.apply(highlight_status, axis=1)
+    st.dataframe(styled_grid, use_container_width=True)
     
-    # Email Management Section
-    st.subheader("📧 Email Management")
+    # Summary stats
+    completed = len([s for s in grid_data if s['Status'] == '✅ Completed'])
+    pending = len(all_students) - completed
+    pass_count = len([s for s in grid_data if s['Pass_Fail'] == 'Pass'])
     
-    col1, col2 = st.columns(2)
-    
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.write("**Current Authorized Emails:**")
-        for i, email in enumerate(st.session_state.authorized_emails):
-            if email != ADMIN_EMAIL:  # Don't allow removing admin
-                if st.button(f"❌ {email}", key=f"remove_{i}"):
-                    st.session_state.authorized_emails.remove(email)
-                    st.rerun()
-            else:
-                st.write(f"🔒 {email} (Admin)")
+        st.metric("Total Students", len(all_students))
+    with col2:
+        st.metric("Completed", completed)
+    with col3:
+        st.metric("Pending", pending)
+    with col4:
+        st.metric("Pass Rate", f"{(pass_count/completed*100):.1f}%" if completed > 0 else "0%")
+    
+    # Auto-refresh and Download
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("🔄 Manual Refresh"):
+            st.rerun()
     
     with col2:
-        st.write("**Add New Email:**")
-        new_email = st.text_input("Enter email address:")
-        if st.button("➕ Add Email"):
-            if new_email and new_email not in st.session_state.authorized_emails:
-                st.session_state.authorized_emails.append(new_email)
-                st.success(f"Added {new_email}")
-                st.rerun()
-            elif new_email in st.session_state.authorized_emails:
-                st.warning("Email already exists")
-        
-        st.write("**Upload Email List:**")
-        uploaded_file = st.file_uploader("Upload CSV/TXT file with emails", type=['csv', 'txt'])
-        if uploaded_file:
-            try:
-                if uploaded_file.name.endswith('.csv'):
-                    df_emails = pd.read_csv(uploaded_file)
-                    emails = df_emails.iloc[:, 0].tolist()  # First column
-                else:
-                    emails = uploaded_file.read().decode('utf-8').strip().split('\n')
-                
-                new_emails = [email.strip() for email in emails if email.strip() and email.strip() not in st.session_state.authorized_emails]
-                
-                if new_emails:
-                    st.session_state.authorized_emails.extend(new_emails)
-                    st.success(f"Added {len(new_emails)} new emails")
-                    st.rerun()
-                else:
-                    st.info("No new emails to add")
-            except Exception as e:
-                st.error(f"Error processing file: {e}")
+        # Auto-refresh toggle
+        auto_refresh = st.checkbox("Auto-refresh (5s)", value=True)
+        if auto_refresh:
+            time.sleep(5)
+            st.rerun()
+    
+    with col3:
+        csv = grid_df.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Report CSV",
+            data=csv,
+            file_name=f"student_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+    
+    # Show last update time
+    st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
 
 def main():
     """Main application"""
