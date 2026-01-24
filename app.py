@@ -3,40 +3,30 @@ import requests
 import tempfile
 import os
 import json
-import base64
+import speech_recognition as sr
+from pydub import AudioSegment
 
-def transcribe_with_grok(audio_file_path, api_key):
-    """Try Grok transcription, fallback to manual input"""
+def transcribe_audio(audio_file_path):
+    """Transcribe audio using Google Speech Recognition"""
     try:
-        url = "https://api.x.ai/v1/chat/completions"
+        # Convert audio to wav if needed
+        audio = AudioSegment.from_file(audio_file_path)
+        wav_path = audio_file_path.replace(os.path.splitext(audio_file_path)[1], '.wav')
+        audio.export(wav_path, format="wav")
         
-        # Read and encode audio file
-        with open(audio_file_path, 'rb') as audio_file:
-            audio_data = base64.b64encode(audio_file.read()).decode('utf-8')
+        # Transcribe
+        r = sr.Recognizer()
+        with sr.AudioFile(wav_path) as source:
+            audio_data = r.record(source)
+            text = r.recognize_google(audio_data)
         
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-        
-        data = {
-            'model': 'grok-beta',
-            'messages': [{
-                'role': 'user', 
-                'content': 'Please transcribe this audio file to text.'
-            }],
-            'temperature': 0.1
-        }
-        
-        response = requests.post(url, headers=headers, json=data)
-        
-        if response.status_code == 200:
-            return response.json()['choices'][0]['message']['content']
-        else:
-            st.warning("Audio transcription not available. Please paste your transcript manually.")
-            return None
+        # Clean up
+        if wav_path != audio_file_path:
+            os.unlink(wav_path)
+            
+        return text
     except Exception as e:
-        st.warning("Audio transcription not available. Please paste your transcript manually.")
+        st.error(f"Transcription failed: {str(e)}")
         return None
 
 def generate_quiz_with_grok(transcript, api_key):
@@ -112,8 +102,8 @@ def main():
                     tmp_file.write(uploaded_file.read())
                     tmp_path = tmp_file.name
                 
-                # Try transcription
-                transcript = transcribe_with_grok(tmp_path, api_key)
+                # Transcribe audio
+                transcript = transcribe_audio(tmp_path)
                 os.unlink(tmp_path)
         
         # Use manual transcript if audio transcription failed
