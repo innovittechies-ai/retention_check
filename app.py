@@ -5,6 +5,8 @@ import requests
 import json
 import os
 import time
+from streamlit_oauth import OAuth2Component
+import base64
 
 # Configuration
 if 'authorized_emails' not in st.session_state:
@@ -212,6 +214,57 @@ Transcript: {transcript}"""
 def login_page():
     st.title("🔐 Quiz Login")
     
+    # Admin login with Google OAuth
+    st.subheader("Admin Login")
+    if st.button("🔐 Sign in with Google (Admin)", key="google_login"):
+        # Google OAuth configuration
+        client_id = st.secrets.get("GOOGLE_CLIENT_ID", "")
+        client_secret = st.secrets.get("GOOGLE_CLIENT_SECRET", "")
+        redirect_uri = st.secrets.get("REDIRECT_URI", "http://localhost:8501")
+        
+        if not client_id or not client_secret:
+            st.error("Google OAuth not configured. Using password login.")
+        else:
+            oauth2 = OAuth2Component(
+                client_id=client_id,
+                client_secret=client_secret,
+                authorize_endpoint="https://accounts.google.com/o/oauth2/v2/auth",
+                token_endpoint="https://oauth2.googleapis.com/token",
+                refresh_token_endpoint="https://oauth2.googleapis.com/token",
+            )
+            
+            result = oauth2.authorize_button(
+                name="Sign in with Google",
+                icon="https://www.google.com/favicon.ico",
+                redirect_uri=redirect_uri,
+                scope="openid email profile",
+                key="google_oauth",
+                extras_params={"prompt": "consent", "access_type": "offline"},
+            )
+            
+            if result and 'token' in result:
+                # Get user info
+                user_info_response = requests.get(
+                    "https://www.googleapis.com/oauth2/v1/userinfo",
+                    headers={"Authorization": f"Bearer {result['token']['access_token']}"}
+                )
+                
+                if user_info_response.status_code == 200:
+                    user_info = user_info_response.json()
+                    email = user_info.get('email', '')
+                    
+                    if email == ADMIN_EMAIL:
+                        st.session_state.logged_in = True
+                        st.session_state.user_email = email
+                        st.success("Admin login successful!")
+                        st.rerun()
+                    else:
+                        st.error(f"Access denied. Only {ADMIN_EMAIL} can access admin panel.")
+    
+    st.divider()
+    
+    # Student login with email/password
+    st.subheader("Student Login")
     with st.form("login_form"):
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
