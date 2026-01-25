@@ -6,14 +6,13 @@ import json
 import os
 import time
 from streamlit_oauth import OAuth2Component
-import base64
 
 # Configuration
 if 'authorized_emails' not in st.session_state:
     st.session_state.authorized_emails = ["pawarharish360@gmail.com"]
 
 ADMIN_EMAIL = "pawarharish360@gmail.com"
-ADMIN_PASSWORD = "6305732001"
+ADMIN_PASSWORD = "admin123"  # Backup password for admin
 
 if 'quiz_results' not in st.session_state:
     st.session_state.quiz_results = []
@@ -216,50 +215,68 @@ def login_page():
     
     # Admin login with Google OAuth
     st.subheader("Admin Login")
-    if st.button("🔐 Sign in with Google (Admin)", key="google_login"):
-        # Google OAuth configuration
-        client_id = st.secrets.get("GOOGLE_CLIENT_ID", "")
-        client_secret = st.secrets.get("GOOGLE_CLIENT_SECRET", "")
-        redirect_uri = st.secrets.get("REDIRECT_URI", "http://localhost:8501")
-        
-        if not client_id or not client_secret:
-            st.error("Google OAuth not configured. Using password login.")
-        else:
-            oauth2 = OAuth2Component(
-                client_id=client_id,
-                client_secret=client_secret,
-                authorize_endpoint="https://accounts.google.com/o/oauth2/v2/auth",
-                token_endpoint="https://oauth2.googleapis.com/token",
-                refresh_token_endpoint="https://oauth2.googleapis.com/token",
-            )
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Option 1: Google OAuth**")
+        if st.button("🔐 Sign in with Google", key="google_login", use_container_width=True):
+            client_id = st.secrets.get("GOOGLE_CLIENT_ID", "")
+            client_secret = st.secrets.get("GOOGLE_CLIENT_SECRET", "")
+            redirect_uri = st.secrets.get("REDIRECT_URI", "http://localhost:8501")
             
-            result = oauth2.authorize_button(
-                name="Sign in with Google",
-                icon="https://www.google.com/favicon.ico",
-                redirect_uri=redirect_uri,
-                scope="openid email profile",
-                key="google_oauth",
-                extras_params={"prompt": "consent", "access_type": "offline"},
-            )
-            
-            if result and 'token' in result:
-                # Get user info
-                user_info_response = requests.get(
-                    "https://www.googleapis.com/oauth2/v1/userinfo",
-                    headers={"Authorization": f"Bearer {result['token']['access_token']}"}
+            if not client_id or not client_secret:
+                st.error("Google OAuth not configured.")
+            else:
+                oauth2 = OAuth2Component(
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    authorize_endpoint="https://accounts.google.com/o/oauth2/v2/auth",
+                    token_endpoint="https://oauth2.googleapis.com/token",
+                    refresh_token_endpoint="https://oauth2.googleapis.com/token",
                 )
                 
-                if user_info_response.status_code == 200:
-                    user_info = user_info_response.json()
-                    email = user_info.get('email', '')
+                result = oauth2.authorize_button(
+                    name="Sign in with Google",
+                    icon="https://www.google.com/favicon.ico",
+                    redirect_uri=redirect_uri,
+                    scope="openid email profile",
+                    key="google_oauth",
+                    extras_params={"prompt": "consent", "access_type": "offline"},
+                )
+                
+                if result and 'token' in result:
+                    user_info_response = requests.get(
+                        "https://www.googleapis.com/oauth2/v1/userinfo",
+                        headers={"Authorization": f"Bearer {result['token']['access_token']}"}
+                    )
                     
-                    if email == ADMIN_EMAIL:
-                        st.session_state.logged_in = True
-                        st.session_state.user_email = email
-                        st.success("Admin login successful!")
-                        st.rerun()
-                    else:
-                        st.error(f"Access denied. Only {ADMIN_EMAIL} can access admin panel.")
+                    if user_info_response.status_code == 200:
+                        user_info = user_info_response.json()
+                        email = user_info.get('email', '')
+                        
+                        if email == ADMIN_EMAIL:
+                            st.session_state.logged_in = True
+                            st.session_state.user_email = email
+                            st.success("Admin login successful!")
+                            st.rerun()
+                        else:
+                            st.error(f"Access denied. Only {ADMIN_EMAIL} allowed.")
+    
+    with col2:
+        st.write("**Option 2: Password**")
+        with st.form("admin_password_form"):
+            admin_pass = st.text_input("Admin Password", type="password")
+            admin_submit = st.form_submit_button("🔑 Login", use_container_width=True)
+            
+            if admin_submit:
+                if admin_pass == ADMIN_PASSWORD:
+                    st.session_state.logged_in = True
+                    st.session_state.user_email = ADMIN_EMAIL
+                    st.success("Admin login successful!")
+                    st.rerun()
+                else:
+                    st.error("Invalid password")
     
     st.divider()
     
@@ -271,12 +288,21 @@ def login_page():
         submit = st.form_submit_button("Login")
         
         if submit:
-            if email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+            if email in st.session_state.authorized_emails and password:
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
                 st.success("Login successful!")
                 st.rerun()
-            elif email in st.session_state.authorized_emails and password:
+            else:
+                st.error("Invalid email or password")   # Student login with email/password
+    st.subheader("Student Login")
+    with st.form("login_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        submit = st.form_submit_button("Login")
+        
+        if submit:
+            if email in st.session_state.authorized_emails and password:
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
                 st.success("Login successful!")
