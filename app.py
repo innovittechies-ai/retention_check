@@ -314,14 +314,13 @@ def quiz_page():
                 st.success("Results saved successfully!")
 
 def admin_dashboard():
+    if 'active_tab' not in st.session_state:
+        st.session_state.active_tab = 0
+    
     tab1, tab2 = st.tabs(["📊 Student Status", "👥 Manage Students"])
     
     with tab1:
         st.header("👨💼 Admin Dashboard")
-        
-        if 'last_refresh' not in st.session_state:
-            st.session_state.last_refresh = time.time()
-        
         st.subheader("📊 Student Status Grid (Auto-refreshing)")
         
         get_quiz_data.clear()
@@ -381,14 +380,11 @@ def admin_dashboard():
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button("🔄 Manual Refresh"):
+            if st.button("🔄 Manual Refresh", key="refresh_status"):
                 st.rerun()
         
         with col2:
-            auto_refresh = st.checkbox("Auto-refresh (15s)", value=False)
-            if auto_refresh:
-                time.sleep(15)
-                st.rerun()
+            auto_refresh = st.checkbox("Auto-refresh (15s)", value=False, key="auto_refresh_status")
         
         with col3:
             csv = grid_df.to_csv(index=False)
@@ -396,10 +392,15 @@ def admin_dashboard():
                 label="📥 Download Report CSV",
                 data=csv,
                 file_name=f"student_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
+                mime="text/csv",
+                key="download_csv_status"
             )
         
         st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
+        
+        if auto_refresh:
+            time.sleep(15)
+            st.rerun()
     
     with tab2:
         st.header("👥 Manage Authorized Students")
