@@ -282,7 +282,7 @@ def login_page():
     
     # Student login with email/password
     st.subheader("Student Login")
-    with st.form("login_form"):
+    with st.form("student_login_form"):
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
         submit = st.form_submit_button("Login")
