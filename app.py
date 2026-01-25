@@ -8,38 +8,9 @@ import time
 
 # Configuration
 if 'authorized_emails' not in st.session_state:
-    st.session_state.authorized_emails = [
-        "admin@admin.com",
-        "anuradharandive04@gmail.com",
-        "shafeekansari2002@gmail.com",
-        "kotireddynarendrareddy@gmail.com",
-        "cheeravinaykumar94@gmail.com",
-        "abinash.kar.november18@gmail.com",
-        "ashfakhshaikh7@gmail.com",
-        "vattesandeep28@gmail.com",
-        "akhima.shaik2003@gmail.com",
-        "shivakumar0752@gmail.com",
-        "praveenbhatlu7@gmail.com",
-        "apurvachavan306@gmail.com",
-        "rakeshpandeeti@gmail.com",
-        "itsmrmanu@gmail.com",
-        "bhanusri1177@gmail.com",
-        "mkrout997@gmail.com",
-        "sowmyavreddy12@gmail.com",
-        "chidrawarsanjana9@gmail.com",
-        "mayuri.shah715@gmail.com",
-        "prasanthchowdary789@gmail.com",
-        "sanjaikumar1202@gmail.com",
-        "shreyas.phansalkar2017@gmail.com",
-        "hksamreen0@gmail.com",
-        "sahilmutha230901@gmail.com",
-        "ankitamarathe25@gmail.com",
-        "tsananse0298@gmail.com",
-        "umakondaru@gmail.com",
-        "hemigipson@gmail.com"
-    ]
+    st.session_state.authorized_emails = ["pawarharish360@gmail.com"]
 
-ADMIN_EMAIL = "admin@admin.com"
+ADMIN_EMAIL = "pawarharish360@gmail.com"
 ADMIN_PASSWORD = "6305732001"
 
 if 'quiz_results' not in st.session_state:
@@ -417,6 +388,33 @@ def admin_dashboard():
         st.header("👥 Manage Authorized Students")
         
         st.write(f"**Total Students: {len([e for e in st.session_state.authorized_emails if e != ADMIN_EMAIL])}**")
+        
+        # Upload text file with emails
+        st.subheader("📤 Upload Student Emails")
+        uploaded_file = st.file_uploader("Upload text file with student emails (one per line)", type=['txt'])
+        
+        if uploaded_file is not None:
+            try:
+                content = uploaded_file.read().decode('utf-8')
+                emails = [email.strip() for email in content.split('\n') if email.strip() and '@' in email]
+                
+                if emails:
+                    # Add admin email if not present
+                    if ADMIN_EMAIL not in emails:
+                        emails.insert(0, ADMIN_EMAIL)
+                    
+                    st.session_state.authorized_emails = emails
+                    if save_authorized_emails(st.session_state.authorized_emails):
+                        st.success(f"Uploaded {len(emails)-1} student emails successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to save emails")
+                else:
+                    st.error("No valid emails found in file")
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+        
+        st.divider()
         
         with st.form("add_student_form"):
             new_email = st.text_input("Add New Student Email")
