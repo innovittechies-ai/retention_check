@@ -314,14 +314,11 @@ def quiz_page():
                 st.success("Results saved successfully!")
 
 def admin_dashboard():
-    if 'active_tab' not in st.session_state:
-        st.session_state.active_tab = 0
-    
     tab1, tab2 = st.tabs(["📊 Student Status", "👥 Manage Students"])
     
     with tab1:
         st.header("👨💼 Admin Dashboard")
-        st.subheader("📊 Student Status Grid (Auto-refreshing)")
+        st.subheader("📊 Student Status Grid")
         
         get_quiz_data.clear()
         results_df = get_quiz_data()
@@ -378,15 +375,12 @@ def admin_dashboard():
         with col4:
             st.metric("Pass Rate", f"{(pass_count/completed*100):.1f}%" if completed > 0 else "0%")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 Manual Refresh", key="refresh_status"):
+            if st.button("🔄 Refresh Data", key="refresh_status"):
                 st.rerun()
         
         with col2:
-            auto_refresh = st.checkbox("Auto-refresh (15s)", value=False, key="auto_refresh_status")
-        
-        with col3:
             csv = grid_df.to_csv(index=False)
             st.download_button(
                 label="📥 Download Report CSV",
@@ -397,10 +391,6 @@ def admin_dashboard():
             )
         
         st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
-        
-        if auto_refresh:
-            time.sleep(15)
-            st.rerun()
     
     with tab2:
         st.header("👥 Manage Authorized Students")
