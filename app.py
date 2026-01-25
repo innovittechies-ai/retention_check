@@ -11,8 +11,8 @@ if 'authorized_emails' not in st.session_state:
     st.session_state.authorized_emails = ["pawarharish360@gmail.com"]
 
 # Admin credentials from secrets (secure - not visible in GitHub)
-ADMIN_EMAIL = "pawarharish360@gmail.com"
-ADMIN_PASSWORD = "YourSecurePassword"
+ADMIN_EMAIL = st.secrets.get("ADMIN_EMAIL", "pawarharish360@gmail.com")
+ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "admin123")
 
 
 if 'quiz_results' not in st.session_state:
@@ -235,20 +235,6 @@ def login_page():
     # Student login
     st.subheader("Student Login")
     with st.form("student_login_form"):
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        submit = st.form_submit_button("Login")
-        
-        if submit:
-            if email in st.session_state.authorized_emails and password:
-                st.session_state.logged_in = True
-                st.session_state.user_email = email
-                st.success("Login successful!")
-                st.rerun()
-            else:
-                st.error("Invalid email or password")   # Student login with email/password
-    st.subheader("Student Login")
-    with st.form("login_form"):
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
         submit = st.form_submit_button("Login")
