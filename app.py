@@ -398,9 +398,9 @@ def admin_dashboard():
                 st.rerun()
         
         with col2:
-            auto_refresh = st.checkbox("Auto-refresh (5s)", value=False)
+            auto_refresh = st.checkbox("Auto-refresh (15s)", value=False)
             if auto_refresh:
-                time.sleep(5)
+                time.sleep(15)
                 st.rerun()
         
         with col3:
