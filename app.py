@@ -409,7 +409,7 @@ def admin_dashboard():
         
         # Upload text file with emails
         st.subheader("📤 Upload Student Emails")
-        uploaded_file = st.file_uploader("Upload text file with student emails (one per line)", type=['txt'])
+        uploaded_file = st.file_uploader("Upload text file with student emails (one per line)", type=['txt'], key="upload_emails_file")
         
         if uploaded_file is not None:
             try:
@@ -455,12 +455,12 @@ def admin_dashboard():
         st.subheader("Current Students")
         
         students = [email for email in st.session_state.authorized_emails if email != ADMIN_EMAIL]
-        for email in students:
+        for idx, email in enumerate(students):
             col1, col2 = st.columns([4, 1])
             with col1:
                 st.text(email)
             with col2:
-                if st.button("🗑️", key=f"del_{email}"):
+                if st.button("🗑️", key=f"del_{idx}_{email.replace('@', '_').replace('.', '_')}"):
                     st.session_state.authorized_emails.remove(email)
                     if save_authorized_emails(st.session_state.authorized_emails):
                         st.success(f"Removed {email}")
