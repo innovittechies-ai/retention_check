@@ -8,11 +8,11 @@ import time
 
 # Configuration
 if 'authorized_emails' not in st.session_state:
-    st.session_state.authorized_emails = ["pawarharish360@gmail.com"]
+    st.session_state.authorized_emails = ["testing@gmail.com"]
 
 # Admin credentials from secrets (secure - not visible in GitHub)
-ADMIN_EMAIL = st.secrets.get("ADMIN_EMAIL", "pawarharish360@gmail.com")
-ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "nopasswrd")
+ADMIN_EMAIL = st.secrets.get("ADMIN_EMAIL", "testing@gmail.com")
+ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "testing")
 
 
 if 'quiz_results' not in st.session_state:
