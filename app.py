@@ -12,7 +12,7 @@ if 'authorized_emails' not in st.session_state:
 
 # Admin credentials from secrets (secure - not visible in GitHub)
 ADMIN_EMAIL = st.secrets.get("ADMIN_EMAIL", "pawarharish360@gmail.com")
-ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "admin123")
+ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "nopasswrd")
 
 
 if 'quiz_results' not in st.session_state:
