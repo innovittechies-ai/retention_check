@@ -610,16 +610,14 @@ def admin_dashboard():
                     
                     export_data.append({
                         'Email': email,
-                        'Scored': score,
-                        'Total': 15,
+                        'Score(15)': score,
                         'Pass_Fail': str(row['Pass_Fail']),
                         'Timestamp': timestamp_ist
                     })
                 else:
                     export_data.append({
                         'Email': email,
-                        'Scored': 0,
-                        'Total': 15,
+                        'Score(15)': 0,
                         'Pass_Fail': 'Not Completed',
                         'Timestamp': 'Not Completed'
                     })
