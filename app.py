@@ -179,16 +179,24 @@ def generate_quiz_with_gemini(transcript, api_key):
 - 4 high complex questions (analysis, problem-solving, and advanced concepts)
 - 3 code-related questions: 2 complex code scenarios + 1 simple code question
 
+CRITICAL REQUIREMENTS FOR CODE QUESTIONS:
+- MUST include actual Python code snippets in the question
+- Format code like: "Consider this code:\ncode here\nWhat is the output?"
+- Code must be directly taken from or based on transcript examples
+- Never reference a code snippet without showing it
+- Options should be actual expected outputs or error messages
+
 IMPORTANT: 
 1. All questions must be directly from the transcript content
 2. DO NOT include difficulty level titles in the question text
 3. Questions should stand alone without showing their difficulty level
+4. Code questions MUST have the actual code visible in the question
 
 Return ONLY valid JSON in this exact format:
 {{
   "questions": [
     {{
-      "question": "Question text here",
+      "question": "Question text here. For code questions include the actual code snippet.",
       "options": ["A) option1", "B) option2", "C) option3", "D) option4"],
       "correct": "A",
       "difficulty": "simple"
@@ -197,7 +205,7 @@ Return ONLY valid JSON in this exact format:
 }}
 
 Use these difficulty levels: simple, medium, complex, or code
-For code questions, include actual Python code directly in the question.
+For code questions: always show actual Python code in the question text.
 
 Transcript: {transcript}"""
 
