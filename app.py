@@ -212,106 +212,179 @@ Transcript: {transcript}"""
         return None
 
 def login_page():
-    # Custom CSS for modern login design
-    st.markdown("""
+    # Load background image if exists
+    bg_image = ""
+    bg_file = None
+    for ext in ['quiz background.webp', 'quiz background.jpg', 'quiz background.png']:
+        if os.path.exists(ext):
+            bg_file = ext
+            break
+    
+    if bg_file:
+        import base64
+        with open(bg_file, "rb") as f:
+            bg_image = base64.b64encode(f.read()).decode()
+        if bg_file.endswith('.webp'):
+            bg_style = f"background-image: url('data:image/webp;base64,{bg_image}');"
+        elif bg_file.endswith('.png'):
+            bg_style = f"background-image: url('data:image/png;base64,{bg_image}');"
+        else:
+            bg_style = f"background-image: url('data:image/jpeg;base64,{bg_image}');"
+    else:
+        bg_style = "background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);"
+    
+    # Custom CSS for modern login design with background image
+    st.markdown(f"""
         <style>
-        .stApp {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .login-container {
-            background: white;
-            padding: 40px;
+        .stApp {{
+            {bg_style}
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        /* Hide default streamlit elements */
+        #MainMenu {{visibility: hidden;}}
+        footer {{visibility: hidden;}}
+        header {{visibility: hidden;}}
+        
+        /* Center container */
+        .block-container {{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding-top: 2rem;
+        }}
+        
+        /* Logo styling */
+        .logo-container {{
+            text-align: center;
+            margin-bottom: 30px;
+        }}
+        
+        /* Login card */
+        .login-card {{
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px 50px;
             border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            max-width: 400px;
-            margin: 100px auto;
-        }
-        .login-title {
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 450px;
+            width: 100%;
+        }}
+        
+        .login-title {{
             text-align: center;
             color: #333;
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 600;
-            margin-bottom: 30px;
-        }
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
+            margin-bottom: 25px;
+        }}
+        
+        /* Tabs styling */
+        .stTabs [data-baseweb="tab-list"] {{
+            gap: 10px;
             justify-content: center;
-        }
-        .stTabs [data-baseweb="tab"] {
-            height: 50px;
-            background-color: #f0f0f0;
+            margin-bottom: 30px;
+        }}
+        .stTabs [data-baseweb="tab"] {{
+            height: 45px;
+            background-color: #e8e8e8;
             border-radius: 10px;
-            padding: 0 30px;
+            padding: 0 35px;
             font-weight: 600;
             color: #666;
-        }
-        .stTabs [aria-selected="true"] {
+            font-size: 14px;
+        }}
+        .stTabs [aria-selected="true"] {{
             background-color: #4a5568 !important;
             color: white !important;
-        }
-        div[data-testid="stForm"] {
+        }}
+        
+        /* Form styling */
+        div[data-testid="stForm"] {{
             border: none;
             padding: 0;
-        }
-        .stTextInput > div > div > input {
+        }}
+        
+        /* Input fields */
+        .stTextInput > div > div > input {{
             border-radius: 10px;
-            border: 1px solid #e0e0e0;
-            padding: 12px;
+            border: 1px solid #d0d0d0;
+            padding: 14px;
+            font-size: 15px;
+            background: white;
+        }}
+        .stTextInput > label {{
             font-size: 14px;
-        }
-        .stButton > button {
+            font-weight: 500;
+            color: #555;
+        }}
+        
+        /* Button styling */
+        .stButton > button {{
             width: 100%;
             background-color: #2d3748;
             color: white;
             border-radius: 10px;
-            padding: 12px;
+            padding: 14px;
             font-weight: 600;
             border: none;
-            margin-top: 20px;
-        }
-        .stButton > button:hover {
+            margin-top: 25px;
+            font-size: 15px;
+        }}
+        .stButton > button:hover {{
             background-color: #1a202c;
-        }
+        }}
         </style>
     """, unsafe_allow_html=True)
     
-    st.markdown('<div class="login-title">Sign In With</div>', unsafe_allow_html=True)
+    # Logo at top center
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if os.path.exists("Logo Full.png"):
+            st.image("Logo Full.png", width=300)
+        st.markdown('<div class="login-title">Sign In With</div>', unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["ADMIN", "STUDENT"])
-    
-    with tab1:
-        with st.form("admin_login_form"):
-            st.text_input("Username", key="admin_username")
-            st.text_input("Password", type="password", key="admin_password")
-            admin_submit = st.form_submit_button("Sign In")
-            
-            if admin_submit:
-                admin_email = st.session_state.admin_username
-                admin_pass = st.session_state.admin_password
-                if admin_email == ADMIN_EMAIL and admin_pass == ADMIN_PASSWORD:
-                    st.session_state.logged_in = True
-                    st.session_state.user_email = ADMIN_EMAIL
-                    st.success("Admin login successful!")
-                    st.rerun()
-                else:
-                    st.error("Invalid admin credentials")
-    
-    with tab2:
-        with st.form("student_login_form"):
-            st.text_input("Username", key="student_username")
-            st.text_input("Password", type="password", key="student_password")
-            submit = st.form_submit_button("Sign In")
-            
-            if submit:
-                email = st.session_state.student_username
-                password = st.session_state.student_password
-                if email in st.session_state.authorized_emails and password:
-                    st.session_state.logged_in = True
-                    st.session_state.user_email = email
-                    st.success("Login successful!")
-                    st.rerun()
-                else:
-                    st.error("Invalid email or password")
+    # Center the login form
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        tab1, tab2 = st.tabs(["ADMIN", "STUDENT"])
+        
+        with tab1:
+            with st.form("admin_login_form"):
+                st.text_input("Username", key="admin_username")
+                st.text_input("Password", type="password", key="admin_password")
+                admin_submit = st.form_submit_button("Sign In")
+                
+                if admin_submit:
+                    admin_email = st.session_state.admin_username
+                    admin_pass = st.session_state.admin_password
+                    if admin_email == ADMIN_EMAIL and admin_pass == ADMIN_PASSWORD:
+                        st.session_state.logged_in = True
+                        st.session_state.user_email = ADMIN_EMAIL
+                        st.success("Admin login successful!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid admin credentials")
+        
+        with tab2:
+            with st.form("student_login_form"):
+                st.text_input("Username", key="student_username")
+                st.text_input("Password", type="password", key="student_password")
+                submit = st.form_submit_button("Sign In")
+                
+                if submit:
+                    email = st.session_state.student_username
+                    password = st.session_state.student_password
+                    if email in st.session_state.authorized_emails and password:
+                        st.session_state.logged_in = True
+                        st.session_state.user_email = email
+                        st.success("Login successful!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid email or password")
 
 def quiz_page():
     if st.session_state.user_email == ADMIN_EMAIL:
@@ -602,11 +675,6 @@ def main():
         else:
             quiz_page()
     else:
-        # Show logo on login page
-        if os.path.exists("Logo Full.png"):
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                st.image("Logo Full.png", width=300)
         login_page()
 
 if __name__ == "__main__":
