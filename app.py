@@ -342,7 +342,7 @@ def login_page():
     """, unsafe_allow_html=True)
     
     # Create split screen layout
-    col1, col2 = st.columns([1, 1], gap="none")
+    col1, col2 = st.columns([1, 1])
     
     with col1:
         # Left side will show background via CSS
