@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import requests
 import json
 import os
 import time
+import io
 
 # Configuration
 if 'authorized_emails' not in st.session_state:
@@ -562,32 +563,57 @@ def admin_dashboard():
                 st.rerun()
         
         with col2:
-            # Create CSV - extract numeric score from Quiz_Score field
-            csv_lines = ['Email,Score,Pass_Fail,Timestamp']
-            
+            # Create Excel export with proper data types
+            export_data = []
             for email in all_students:
                 student_result = results_df[results_df['Email'] == email] if not results_df.empty else pd.DataFrame()
                 if not student_result.empty:
                     row = student_result.iloc[-1]
                     quiz_score_raw = str(row['Quiz_Score'])
-                    # Extract just the number before the slash (e.g., "7" from "7/10")
+                    # Extract just the number before the slash (e.g., 7 from "7/10")
                     if '/' in quiz_score_raw:
-                        score = quiz_score_raw.split('/')[0]
+                        score = int(quiz_score_raw.split('/')[0])
                     else:
-                        score = quiz_score_raw
-                    pass_fail = str(row['Pass_Fail'])
-                    timestamp = str(row['Timestamp'])
-                    csv_lines.append(f'{email},{score},{pass_fail},{timestamp}')
+                        score = 0
+                    
+                    # Convert timestamp to IST
+                    timestamp_str = str(row['Timestamp'])
+                    try:
+                        dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                        ist = timezone(timedelta(hours=5, minutes=30))
+                        dt_ist = dt.replace(tzinfo=timezone.utc).astimezone(ist)
+                        timestamp_ist = dt_ist.strftime("%Y-%m-%d %H:%M:%S IST")
+                    except:
+                        timestamp_ist = timestamp_str
+                    
+                    export_data.append({
+                        'Email': email,
+                        'Score': score,
+                        'Pass_Fail': str(row['Pass_Fail']),
+                        'Timestamp': timestamp_ist
+                    })
                 else:
-                    csv_lines.append(f'{email},0,Not Completed,Not Completed')
+                    export_data.append({
+                        'Email': email,
+                        'Score': 0,
+                        'Pass_Fail': 'Not Completed',
+                        'Timestamp': 'Not Completed'
+                    })
             
-            csv = '\n'.join(csv_lines)
+            export_df = pd.DataFrame(export_data)
+            
+            # Create Excel file in memory
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                export_df.to_excel(writer, index=False, sheet_name='Quiz Results')
+            output.seek(0)
+            
             st.download_button(
-                label="📥 Download Report CSV",
-                data=csv,
-                file_name=f"student_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv",
-                key="download_csv_status"
+                label="📥 Download Report Excel",
+                data=output,
+                file_name=f"student_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_excel_status"
             )
         
         st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
