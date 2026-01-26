@@ -381,7 +381,7 @@ def admin_dashboard():
                 st.rerun()
         
         with col2:
-            # Create clean CSV export
+            # Create clean CSV export with proper quoting to prevent Excel date conversion
             csv_export_data = []
             for email in all_students:
                 student_result = results_df[results_df['Email'] == email] if not results_df.empty else pd.DataFrame()
@@ -389,7 +389,7 @@ def admin_dashboard():
                     row = student_result.iloc[-1]
                     csv_export_data.append({
                         'Email': email,
-                        'Score': str(row['Quiz_Score']),
+                        'Score': f"'{row['Quiz_Score']}",
                         'Pass_Fail': str(row['Pass_Fail']),
                         'Timestamp': str(row['Timestamp'])
                     })
@@ -402,7 +402,7 @@ def admin_dashboard():
                     })
             
             csv_export_df = pd.DataFrame(csv_export_data)
-            csv = csv_export_df.to_csv(index=False)
+            csv = csv_export_df.to_csv(index=False, quoting=1)
             st.download_button(
                 label="📥 Download Report CSV",
                 data=csv,
