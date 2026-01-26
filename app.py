@@ -173,9 +173,11 @@ def save_quiz_result(email, score, pass_fail):
 def generate_quiz_with_gemini(transcript, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
     
-    prompt = f"""Based on this transcript, create exactly 10 multiple choice questions:
-- 5 easy questions (basic comprehension)
-- 5 complex questions (analysis/inference)
+    prompt = f"""Based on this transcript, create exactly 15 multiple choice questions:
+- 4 easy questions (basic comprehension/discussion orineted)
+- 4 moderate questions (analysis/inference/technical)
+- 4 complex questions (complete technical understanding/design pattern/architecture)
+- 3 programming questions (code orinted) make 100% sure it do not cause any json parsing issue 
 
 Format as JSON:
 {{
@@ -442,7 +444,7 @@ def quiz_page():
         user_answers = {}
         
         for i, q in enumerate(current_quiz):
-            st.subheader(f"Q{i+1} ({q['difficulty'].title()})")
+            st.subheader(f"Q{i+1}")
             st.write(q['question'])
             user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
         
@@ -679,8 +681,6 @@ def main():
         with col1:
             if os.path.exists("Logo Full.png"):
                 st.image("Logo Full.png", width=150)
-        with col2:
-            st.image("Logo Full.png", width=150)
         with col3:
             st.markdown(f"**{st.session_state.user_email}**")
             if st.button("🚪 Logout"):
