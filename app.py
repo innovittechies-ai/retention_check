@@ -381,19 +381,24 @@ def admin_dashboard():
                 st.rerun()
         
         with col2:
-            # Create clean CSV export - manual string building to avoid Excel date conversion
+            # Create CSV - extract numeric score from Quiz_Score field
             csv_lines = ['Email,Score,Pass_Fail,Timestamp']
             
             for email in all_students:
                 student_result = results_df[results_df['Email'] == email] if not results_df.empty else pd.DataFrame()
                 if not student_result.empty:
                     row = student_result.iloc[-1]
-                    score = str(row['Quiz_Score']).replace(',', ';')  # Replace commas to avoid CSV issues
+                    quiz_score_raw = str(row['Quiz_Score'])
+                    # Extract just the number before the slash (e.g., "7" from "7/10")
+                    if '/' in quiz_score_raw:
+                        score = quiz_score_raw.split('/')[0]
+                    else:
+                        score = quiz_score_raw
                     pass_fail = str(row['Pass_Fail'])
                     timestamp = str(row['Timestamp'])
-                    csv_lines.append(f'{email},="{score}",{pass_fail},{timestamp}')
+                    csv_lines.append(f'{email},{score},{pass_fail},{timestamp}')
                 else:
-                    csv_lines.append(f'{email},Not Completed,Not Completed,Not Completed')
+                    csv_lines.append(f'{email},0,Not Completed,Not Completed')
             
             csv = '\n'.join(csv_lines)
             st.download_button(
