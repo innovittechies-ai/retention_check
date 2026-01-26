@@ -389,9 +389,9 @@ def admin_dashboard():
                     row = student_result.iloc[-1]
                     csv_export_data.append({
                         'Email': email,
-                        'Score': row['Quiz_Score'],
-                        'Pass_Fail': row['Pass_Fail'],
-                        'Timestamp': row['Timestamp']
+                        'Score': str(row['Quiz_Score']),
+                        'Pass_Fail': str(row['Pass_Fail']),
+                        'Timestamp': str(row['Timestamp'])
                     })
                 else:
                     csv_export_data.append({
