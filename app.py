@@ -173,41 +173,28 @@ def save_quiz_result(email, score, pass_fail):
 def generate_quiz_with_gemini(transcript, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
     
-    prompt = f"""Based on this Python programming transcript, create exactly 15 multiple choice questions with the following distribution:
-- 4 simple/basic questions (fundamental concepts and comprehension)
-- 4 medium questions (application and moderate understanding)  
-- 4 high complex questions (analysis, problem-solving, and advanced concepts)
-- 3 code-related questions: 2 complex code scenarios + 1 simple code question
+    prompt = f"""Create exactly 15 multiple choice Python quiz questions from the transcript below:
 
-CRITICAL REQUIREMENTS FOR CODE QUESTIONS:
-- MUST include actual Python code snippets in the question
-- Format code like: "Consider this code:\ncode here\nWhat is the output?"
-- Code must be directly taken from or based on transcript examples
-- Never reference a code snippet without showing it
-- Options should be actual expected outputs or error messages
+QUESTION DISTRIBUTION:
+- 4 simple questions: Basic concepts and comprehension
+- 4 medium questions: Application and deeper understanding
+- 4 complex questions: Analysis, problem-solving, advanced concepts
+- 3 code questions: Include actual Python code snippets in question
 
-IMPORTANT: 
-1. All questions must be directly from the transcript content
-2. DO NOT include difficulty level titles in the question text
-3. Questions should stand alone without showing their difficulty level
-4. Code questions MUST have the actual code visible in the question
+REQUIREMENTS:
+1. All questions based directly on transcript content
+2. Do NOT show difficulty level in the question
+3. For code questions: Include the actual Python code in the question text
+4. Each option should be realistic and plausible
+5. Provide the correct answer letter (A, B, C, or D)
 
-Return ONLY valid JSON in this exact format:
-{{
-  "questions": [
-    {{
-      "question": "Question text here. For code questions include the actual code snippet.",
-      "options": ["A) option1", "B) option2", "C) option3", "D) option4"],
-      "correct": "A",
-      "difficulty": "simple"
-    }}
-  ]
-}}
+OUTPUT FORMAT - Return valid JSON only:
+{{"questions": [{{"question": "question text here", "options": ["A) answer1", "B) answer2", "C) answer3", "D) answer4"], "correct": "A", "difficulty": "simple"}}]}}
 
-Use these difficulty levels: simple, medium, complex, or code
-For code questions: always show actual Python code in the question text.
+Difficulty values: simple, medium, complex, code
 
-Transcript: {transcript}"""
+TRANSCRIPT:
+{transcript}"""
 
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
