@@ -688,8 +688,6 @@ def main():
         with col1:
             if os.path.exists("Logo Full.png"):
                 st.image("Logo Full.png", width=150)
-        with col2:
-            st.image("Logo Full.png", width=150)
         with col3:
             st.markdown(f"**{st.session_state.user_email}**")
             if st.button("🚪 Logout"):
