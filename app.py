@@ -304,11 +304,17 @@ def login_page():
             color: white !important;
         }}
         
+        /* Tab content alignment */
+        .stTabs [data-baseweb="tab-panel"] {{
+            padding-top: 20px;
+        }}
+        
         div[data-testid="stForm"] {{
             border: none;
             padding: 0;
             width: 100%;
             max-width: 400px;
+            margin: 0 auto;
         }}
         
         .stTextInput > div > div > input {{
