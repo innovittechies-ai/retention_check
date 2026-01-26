@@ -173,18 +173,27 @@ def save_quiz_result(email, score, pass_fail):
 def generate_quiz_with_gemini(transcript, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
     
-    prompt = f"""Based on this transcript, create exactly 10 multiple choice questions:
-- 5 easy questions (basic comprehension)
-- 5 complex questions (analysis/inference)
+    prompt = f"""Based on this Python programming transcript, create exactly 15 multiple choice questions with the following distribution:
+- 5 simple questions (basic comprehension and fundamental concepts)
+- 5 moderate questions (application and deeper understanding)
+- 2 complex questions (analysis, problem-solving, and edge cases)
+- 3 code-related questions (practical coding scenarios with code snippets)
 
-Format as JSON:
+Requirements:
+1. All questions MUST be directly related to the transcript content
+2. For code-related questions, include actual Python code snippets in the question
+3. Code questions should test understanding of output, logic, or syntax
+4. Ensure options are plausible distractors, not obviously wrong
+5. Mix different Python concepts (variables, functions, loops, data structures, OOP, etc.)
+
+Format STRICTLY as JSON:
 {{
   "questions": [
     {{
-      "question": "Question text",
+      "question": "Question text (include code snippets for code-related questions within triple backticks)",
       "options": ["A) option1", "B) option2", "C) option3", "D) option4"],
       "correct": "A",
-      "difficulty": "easy"
+      "difficulty": "simple|moderate|complex|code"
     }}
   ]
 }}
@@ -680,7 +689,7 @@ def main():
             if os.path.exists("Logo Full.png"):
                 st.image("Logo Full.png", width=150)
         with col2:
-            st.markdown(f"### 📝 Quiz Application")
+            st.image("Logo Full.png", width=150)
         with col3:
             st.markdown(f"**{st.session_state.user_email}**")
             if st.button("🚪 Logout"):
