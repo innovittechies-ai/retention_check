@@ -174,12 +174,15 @@ def generate_quiz_with_gemini(transcript, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
     
     prompt = f"""Based on this Python programming transcript, create exactly 15 multiple choice questions with the following distribution:
-- 5 simple questions (basic comprehension and fundamental concepts)
-- 5 moderate questions (application and deeper understanding)  
-- 2 complex questions (analysis, problem-solving, and edge cases)
-- 3 code-related questions (practical coding scenarios - show actual Python code in questions)
+- 4 simple/basic questions (fundamental concepts and comprehension)
+- 4 medium questions (application and moderate understanding)  
+- 4 high complex questions (analysis, problem-solving, and advanced concepts)
+- 3 code-related questions: 2 complex code scenarios + 1 simple code question
 
-IMPORTANT: All questions must be directly from the transcript content.
+IMPORTANT: 
+1. All questions must be directly from the transcript content
+2. DO NOT include difficulty level titles in the question text
+3. Questions should stand alone without showing their difficulty level
 
 Return ONLY valid JSON in this exact format:
 {{
@@ -193,8 +196,8 @@ Return ONLY valid JSON in this exact format:
   ]
 }}
 
-Use these difficulty levels: simple, moderate, complex, or code
-For code questions, include Python code directly in the question text.
+Use these difficulty levels: simple, medium, complex, or code
+For code questions, include actual Python code directly in the question.
 
 Transcript: {transcript}"""
 
