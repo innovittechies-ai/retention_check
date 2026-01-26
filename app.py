@@ -381,28 +381,21 @@ def admin_dashboard():
                 st.rerun()
         
         with col2:
-            # Create clean CSV export with proper quoting to prevent Excel date conversion
-            csv_export_data = []
+            # Create clean CSV export - manual string building to avoid Excel date conversion
+            csv_lines = ['Email,Score,Pass_Fail,Timestamp']
+            
             for email in all_students:
                 student_result = results_df[results_df['Email'] == email] if not results_df.empty else pd.DataFrame()
                 if not student_result.empty:
                     row = student_result.iloc[-1]
-                    csv_export_data.append({
-                        'Email': email,
-                        'Score': f"'{row['Quiz_Score']}",
-                        'Pass_Fail': str(row['Pass_Fail']),
-                        'Timestamp': str(row['Timestamp'])
-                    })
+                    score = str(row['Quiz_Score']).replace(',', ';')  # Replace commas to avoid CSV issues
+                    pass_fail = str(row['Pass_Fail'])
+                    timestamp = str(row['Timestamp'])
+                    csv_lines.append(f'{email},="{score}",{pass_fail},{timestamp}')
                 else:
-                    csv_export_data.append({
-                        'Email': email,
-                        'Score': 'Not Completed',
-                        'Pass_Fail': 'Not Completed',
-                        'Timestamp': 'Not Completed'
-                    })
+                    csv_lines.append(f'{email},Not Completed,Not Completed,Not Completed')
             
-            csv_export_df = pd.DataFrame(csv_export_data)
-            csv = csv_export_df.to_csv(index=False, quoting=1)
+            csv = '\n'.join(csv_lines)
             st.download_button(
                 label="📥 Download Report CSV",
                 data=csv,
