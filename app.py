@@ -345,8 +345,17 @@ def login_page():
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        # Left side will show background via CSS
-        st.markdown('<div class="left-side"></div>', unsafe_allow_html=True)
+        # Left side - show background image
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
+        if bg_file and os.path.exists(bg_file):
+            st.image(bg_file, use_container_width=True)
+        else:
+            st.markdown("""
+                <div style='height: 100vh; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); 
+                display: flex; align-items: center; justify-content: center;'>
+                    <h1 style='color: white; font-size: 48px;'>QUIZ</h1>
+                </div>
+            """, unsafe_allow_html=True)
     
     with col2:
         # Logo at top center
