@@ -174,16 +174,23 @@ def generate_quiz_with_gemini(transcript, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
     
     prompt = f"""Based on this transcript, create exactly 15 multiple choice questions:
-- 4 easy questions (basic comprehension/discussion orineted)
+- 4 easy questions (basic comprehension/discussion oriented)
 - 4 moderate questions (analysis/inference/technical)
 - 4 complex questions (complete technical understanding/design pattern/architecture)
-- 3 programming questions (code orinted) make 100% sure it do not cause any json parsing issue 
+- 3 programming questions (code oriented)
 
-Format as JSON:
+IMPORTANT JSON RULES:
+1. Use ONLY plain text in questions and options - NO code snippets
+2. For programming questions, describe the code scenario in plain text
+3. Escape all special characters properly
+4. Keep all text on single lines
+5. Use simple quotes or describe code logic instead of actual code
+
+Format STRICTLY as valid JSON:
 {{
   "questions": [
     {{
-      "question": "Question text",
+      "question": "Question text in plain English",
       "options": ["A) option1", "B) option2", "C) option3", "D) option4"],
       "correct": "A",
       "difficulty": "easy"
@@ -201,13 +208,23 @@ Transcript: {transcript}"""
     if response.status_code == 200:
         try:
             content = response.json()['candidates'][0]['content']['parts'][0]['text']
+            # Extract JSON from markdown code blocks
             if '```json' in content:
                 content = content.split('```json')[1].split('```')[0].strip()
             elif '```' in content:
                 content = content.split('```')[1].strip()
+            
+            # Clean up common JSON issues
+            content = content.replace('\n', ' ').replace('\r', '')
+            content = content.replace('\\n', ' ')
+            
             return json.loads(content)
-        except Exception as e:
+        except json.JSONDecodeError as e:
             st.error(f"Failed to parse quiz JSON: {e}")
+            st.error("The AI generated invalid JSON. Please try again or simplify your transcript.")
+            return None
+        except Exception as e:
+            st.error(f"Error processing quiz: {e}")
             return None
     else:
         st.error(f"Quiz generation failed: {response.text}")
