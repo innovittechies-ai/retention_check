@@ -173,35 +173,23 @@ def save_quiz_result(email, score, pass_fail):
 def generate_quiz_with_gemini(transcript, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
     
-    prompt = f"""You are creating a Python quiz with EXACTLY 15 questions from the transcript.
+    prompt = f"""Based on this transcript, create exactly 10 multiple choice questions:
+- 5 easy questions (basic comprehension)
+- 5 complex questions (analysis/inference)
 
-QUESTION BREAKDOWN:
-- 4 simple questions: Basic concepts, definitions, and fundamental understanding
-- 4 medium-high questions: Application, comparison, and practical scenarios  
-- 4 high complex questions: Analysis, inference, edge cases, and advanced concepts
-- 3 code-related questions: 2 complex code scenarios + 1 simple code question (include actual Python code snippets)
+Format as JSON:
+{{
+  "questions": [
+    {{
+      "question": "Question text",
+      "options": ["A) option1", "B) option2", "C) option3", "D) option4"],
+      "correct": "A",
+      "difficulty": "easy"
+    }}
+  ]
+}}
 
-INSTRUCTIONS:
-1. Base all questions strictly on the transcript content
-2. For code questions, include working Python code examples in the question
-3. Do NOT show difficulty labels in the question text
-4. Create realistic, plausible answer options
-5. Ensure each question has only ONE correct answer (A, B, C, or D)
-6. Return ONLY valid JSON in this format:
-{{"questions": [{{"question": "text", "options": ["A) opt", "B) opt", "C) opt", "D) opt"], "correct": "A", "difficulty": "simple"}}]}}
-
-DIFFICULTY LEVELS: Use only - simple, medium, complex, code
-
-CODE QUESTION EXAMPLE:
-"What will this code output?
-x = 10
-y = x * 2
-print(y)"
-
-RETURN ONLY JSON - NO EXTRA TEXT
-
-Transcript:
-{transcript}"""
+Transcript: {transcript}"""
 
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -211,28 +199,13 @@ Transcript:
     if response.status_code == 200:
         try:
             content = response.json()['candidates'][0]['content']['parts'][0]['text']
-            
             if '```json' in content:
                 content = content.split('```json')[1].split('```')[0].strip()
             elif '```' in content:
-                content = content.split('```')[1].split('```')[0].strip()
-            
-            start_idx = content.find('{')
-            end_idx = content.rfind('}')
-            if start_idx != -1 and end_idx != -1:
-                content = content[start_idx:end_idx+1]
-            
-            quiz_data = json.loads(content)
-            if 'questions' in quiz_data and isinstance(quiz_data['questions'], list):
-                return quiz_data
-            else:
-                st.error("Invalid quiz structure returned")
-                return None
-        except json.JSONDecodeError as e:
-            st.error(f"JSON Error: Invalid response format")
-            return None
+                content = content.split('```')[1].strip()
+            return json.loads(content)
         except Exception as e:
-            st.error(f"Processing Error: {type(e).__name__}")
+            st.error(f"Failed to parse quiz JSON: {e}")
             return None
     else:
         st.error(f"Quiz generation failed: {response.text}")
@@ -469,7 +442,7 @@ def quiz_page():
         user_answers = {}
         
         for i, q in enumerate(current_quiz):
-            st.subheader(f"Q{i+1}")
+            st.subheader(f"Q{i+1} ({q['difficulty'].title()})")
             st.write(q['question'])
             user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
         
