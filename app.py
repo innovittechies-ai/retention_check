@@ -225,53 +225,54 @@ def login_page():
         with open(bg_file, "rb") as f:
             bg_image = base64.b64encode(f.read()).decode()
         if bg_file.endswith('.webp'):
-            bg_style = f"background-image: url('data:image/webp;base64,{bg_image}');"
+            bg_url = f"data:image/webp;base64,{bg_image}"
         elif bg_file.endswith('.png'):
-            bg_style = f"background-image: url('data:image/png;base64,{bg_image}');"
+            bg_url = f"data:image/png;base64,{bg_image}"
         else:
-            bg_style = f"background-image: url('data:image/jpeg;base64,{bg_image}');"
+            bg_url = f"data:image/jpeg;base64,{bg_image}"
     else:
-        bg_style = "background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);"
+        bg_url = ""
     
-    # Custom CSS for modern login design with background image
+    # Custom CSS for split screen design
     st.markdown(f"""
         <style>
         .stApp {{
-            {bg_style}
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
+            background: white;
         }}
-        /* Hide default streamlit elements */
         #MainMenu {{visibility: hidden;}}
         footer {{visibility: hidden;}}
         header {{visibility: hidden;}}
         
-        /* Center container */
         .block-container {{
+            padding: 0 !important;
+            max-width: 100% !important;
+        }}
+        
+        /* Split screen container */
+        .split-container {{
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }}
+        
+        /* Left side - Background image */
+        .left-side {{
+            flex: 1;
+            background-image: url('{bg_url}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }}
+        
+        /* Right side - Login form */
+        .right-side {{
+            flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
-            padding-top: 2rem;
-        }}
-        
-        /* Logo styling */
-        .logo-container {{
-            text-align: center;
-            margin-bottom: 30px;
-        }}
-        
-        /* Login card */
-        .login-card {{
-            background: rgba(255, 255, 255, 0.95);
-            padding: 40px 50px;
-            border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            max-width: 450px;
-            width: 100%;
+            background: #f8f9fa;
+            padding: 40px;
         }}
         
         .login-title {{
@@ -280,6 +281,7 @@ def login_page():
             font-size: 24px;
             font-weight: 600;
             margin-bottom: 25px;
+            margin-top: 20px;
         }}
         
         /* Tabs styling */
@@ -302,13 +304,13 @@ def login_page():
             color: white !important;
         }}
         
-        /* Form styling */
         div[data-testid="stForm"] {{
             border: none;
             padding: 0;
+            width: 100%;
+            max-width: 400px;
         }}
         
-        /* Input fields */
         .stTextInput > div > div > input {{
             border-radius: 10px;
             border: 1px solid #d0d0d0;
@@ -322,7 +324,6 @@ def login_page():
             color: #555;
         }}
         
-        /* Button styling */
         .stButton > button {{
             width: 100%;
             background-color: #2d3748;
@@ -340,16 +341,24 @@ def login_page():
         </style>
     """, unsafe_allow_html=True)
     
-    # Logo at top center
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if os.path.exists("Logo Full.png"):
-            st.image("Logo Full.png", width=300)
-        st.markdown('<div class="login-title">Sign In With</div>', unsafe_allow_html=True)
+    # Create split screen layout
+    col1, col2 = st.columns([1, 1], gap="none")
     
-    # Center the login form
-    col1, col2, col3 = st.columns([1, 2, 1])
+    with col1:
+        # Left side will show background via CSS
+        st.markdown('<div class="left-side"></div>', unsafe_allow_html=True)
+    
     with col2:
+        # Logo at top center
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        if os.path.exists("Logo Full.png"):
+            col_a, col_b, col_c = st.columns([1, 2, 1])
+            with col_b:
+                st.image("Logo Full.png", width=250)
+        
+        st.markdown('<div class="login-title">Sign In With</div>', unsafe_allow_html=True)
+        
+        # Login form
         tab1, tab2 = st.tabs(["ADMIN", "STUDENT"])
         
         with tab1:
