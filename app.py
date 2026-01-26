@@ -173,27 +173,45 @@ def save_quiz_result(email, score, pass_fail):
 def generate_quiz_with_gemini(transcript, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
     
-    prompt = f"""Create exactly 15 multiple choice Python quiz questions from the transcript below:
+    prompt = f"""You are creating a Python quiz with EXACTLY 15 questions from the transcript.
 
-QUESTION DISTRIBUTION:
-- 4 simple questions: Basic concepts and comprehension
-- 4 medium questions: Application and deeper understanding
-- 4 complex questions: Analysis, problem-solving, advanced concepts
-- 3 code questions: Include actual Python code snippets in question
+QUESTION BREAKDOWN:
+- 4 simple questions: Basic concepts, definitions, and fundamental understanding
+- 4 medium-high questions: Application, comparison, and practical scenarios  
+- 4 high complex questions: Analysis, inference, edge cases, and advanced concepts
+- 3 code-related questions: 2 complex code scenarios + 1 simple code question (include actual Python code snippets)
 
-REQUIREMENTS:
-1. All questions based directly on transcript content
-2. Do NOT show difficulty level in the question
-3. For code questions: Include the actual Python code in the question text
-4. Each option should be realistic and plausible
-5. Provide the correct answer letter (A, B, C, or D)
+INSTRUCTIONS:
+1. Base all questions strictly on the transcript content
+2. For code questions, include working Python code examples in the question
+3. Do NOT show difficulty labels in the question text
+4. Create realistic, plausible answer options
+5. Ensure each question has only ONE correct answer (A, B, C, or D)
+6. Use this exact JSON structure:
 
-OUTPUT FORMAT - Return valid JSON only:
-{{"questions": [{{"question": "question text here", "options": ["A) answer1", "B) answer2", "C) answer3", "D) answer4"], "correct": "A", "difficulty": "simple"}}]}}
+{
+  "questions": [
+    {
+      "question": "Question text here",
+      "options": ["A) first option", "B) second option", "C) third option", "D) fourth option"],
+      "correct": "A",
+      "difficulty": "simple"
+    }
+  ]
+}
 
-Difficulty values: simple, medium, complex, code
+DIFFICULTY LEVELS: Use only these - simple, medium, complex, code
 
-TRANSCRIPT:
+EXAMPLE CODE QUESTION FORMAT:
+If the transcript mentions a Python code example, format like:
+"What will this code output?
+x = 10
+y = x * 2
+print(y)"
+
+RETURN ONLY THE JSON - NO EXTRA TEXT
+
+Transcript Content:
 {transcript}"""
 
     headers = {'Content-Type': 'application/json'}
@@ -204,13 +222,28 @@ TRANSCRIPT:
     if response.status_code == 200:
         try:
             content = response.json()['candidates'][0]['content']['parts'][0]['text']
+            
             if '```json' in content:
                 content = content.split('```json')[1].split('```')[0].strip()
             elif '```' in content:
-                content = content.split('```')[1].strip()
-            return json.loads(content)
+                content = content.split('```')[1].split('```')[0].strip()
+            
+            start_idx = content.find('{')
+            end_idx = content.rfind('}')
+            if start_idx != -1 and end_idx != -1:
+                content = content[start_idx:end_idx+1]
+            
+            quiz_data = json.loads(content)
+            if 'questions' in quiz_data and isinstance(quiz_data['questions'], list):
+                return quiz_data
+            else:
+                st.error("Invalid quiz structure returned")
+                return None
+        except json.JSONDecodeError as e:
+            st.error(f"JSON Error: Invalid response format")
+            return None
         except Exception as e:
-            st.error(f"Failed to parse quiz JSON: {e}")
+            st.error(f"Processing Error: {type(e).__name__}")
             return None
     else:
         st.error(f"Quiz generation failed: {response.text}")
