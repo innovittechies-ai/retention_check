@@ -187,31 +187,20 @@ INSTRUCTIONS:
 3. Do NOT show difficulty labels in the question text
 4. Create realistic, plausible answer options
 5. Ensure each question has only ONE correct answer (A, B, C, or D)
-6. Use this exact JSON structure:
+6. Return ONLY valid JSON in this format:
+{{"questions": [{{"question": "text", "options": ["A) opt", "B) opt", "C) opt", "D) opt"], "correct": "A", "difficulty": "simple"}}]}}
 
-{
-  "questions": [
-    {
-      "question": "Question text here",
-      "options": ["A) first option", "B) second option", "C) third option", "D) fourth option"],
-      "correct": "A",
-      "difficulty": "simple"
-    }
-  ]
-}
+DIFFICULTY LEVELS: Use only - simple, medium, complex, code
 
-DIFFICULTY LEVELS: Use only these - simple, medium, complex, code
-
-EXAMPLE CODE QUESTION FORMAT:
-If the transcript mentions a Python code example, format like:
+CODE QUESTION EXAMPLE:
 "What will this code output?
 x = 10
 y = x * 2
 print(y)"
 
-RETURN ONLY THE JSON - NO EXTRA TEXT
+RETURN ONLY JSON - NO EXTRA TEXT
 
-Transcript Content:
+Transcript:
 {transcript}"""
 
     headers = {'Content-Type': 'application/json'}
