@@ -381,7 +381,28 @@ def admin_dashboard():
                 st.rerun()
         
         with col2:
-            csv = grid_df.to_csv(index=False)
+            # Create clean CSV export
+            csv_export_data = []
+            for email in all_students:
+                student_result = results_df[results_df['Email'] == email] if not results_df.empty else pd.DataFrame()
+                if not student_result.empty:
+                    row = student_result.iloc[-1]
+                    csv_export_data.append({
+                        'Email': email,
+                        'Score': row['Quiz_Score'],
+                        'Pass_Fail': row['Pass_Fail'],
+                        'Timestamp': row['Timestamp']
+                    })
+                else:
+                    csv_export_data.append({
+                        'Email': email,
+                        'Score': 'Not Completed',
+                        'Pass_Fail': 'Not Completed',
+                        'Timestamp': 'Not Completed'
+                    })
+            
+            csv_export_df = pd.DataFrame(csv_export_data)
+            csv = csv_export_df.to_csv(index=False)
             st.download_button(
                 label="📥 Download Report CSV",
                 data=csv,
