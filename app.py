@@ -452,7 +452,7 @@ def quiz_page():
         user_answers = {}
         
         for i, q in enumerate(current_quiz):
-            st.subheader(f"Q{i+1} ({q['difficulty'].title()})")
+            st.subheader(f"Q{i+1}")
             st.write(q['question'])
             user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
         
