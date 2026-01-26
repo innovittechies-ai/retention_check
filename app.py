@@ -124,7 +124,21 @@ def load_quiz_results():
     if os.path.exists(RESULTS_FILE):
         try:
             with open(RESULTS_FILE, 'r') as f:
-                return json.load(f)
+                results = json.load(f)
+                # Migrate old format to new format (Quiz_Score -> Scored)
+                migrated_results = []
+                for result in results:
+                    migrated_result = result.copy()
+                    if 'Quiz_Score' in migrated_result and 'Scored' not in migrated_result:
+                        # Extract just the number from "X/Y" format if it exists
+                        score_val = migrated_result.get('Quiz_Score', 0)
+                        if isinstance(score_val, str) and '/' in score_val:
+                            migrated_result['Scored'] = int(score_val.split('/')[0])
+                        else:
+                            migrated_result['Scored'] = int(score_val) if score_val else 0
+                        del migrated_result['Quiz_Score']
+                    migrated_results.append(migrated_result)
+                return migrated_results
         except:
             return []
     return []
@@ -522,10 +536,12 @@ def admin_dashboard():
             
             if not student_result.empty:
                 row = student_result.iloc[-1]
+                # Handle both old and new column names
+                score = row.get('Scored') if 'Scored' in row.index else row.get('Quiz_Score', 0)
                 grid_data.append({
                     'Email': email,
                     'Status': '✅ Completed',
-                    'Score': row['Scored'],
+                    'Score': score,
                     'Pass_Fail': row['Pass_Fail'],
                     'Timestamp': row['Timestamp']
                 })
@@ -578,8 +594,15 @@ def admin_dashboard():
                 student_result = results_df[results_df['Email'] == email] if not results_df.empty else pd.DataFrame()
                 if not student_result.empty:
                     row = student_result.iloc[-1]
-                    # Score is now stored as integer
-                    score = int(row['Scored']) if pd.notna(row['Scored']) else 0
+                    # Handle both old and new column names
+                    if 'Scored' in row.index:
+                        score = int(row['Scored']) if pd.notna(row['Scored']) else 0
+                    else:
+                        score_val = row.get('Quiz_Score', 0)
+                        if isinstance(score_val, str) and '/' in score_val:
+                            score = int(score_val.split('/')[0])
+                        else:
+                            score = int(score_val) if score_val else 0
                     
                     # Timestamp is already stored in IST
                     timestamp_str = str(row['Timestamp'])
