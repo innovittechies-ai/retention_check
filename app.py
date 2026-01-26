@@ -140,7 +140,12 @@ def save_quiz_results(results):
 @st.cache_data
 def get_quiz_data():
     results = load_quiz_results()
-    return pd.DataFrame(results)
+    df = pd.DataFrame(results)
+    if not df.empty:
+        # Ensure Scored column is integer
+        if 'Scored' in df.columns:
+            df['Scored'] = pd.to_numeric(df['Scored'], errors='coerce').fillna(0).astype(int)
+    return df
 
 def save_quiz_result(email, score, pass_fail):
     try:
@@ -151,10 +156,14 @@ def save_quiz_result(email, score, pass_fail):
                 existing_index = i
                 break
         
+        # Convert IST timezone
+        ist = timezone(timedelta(hours=5, minutes=30))
+        dt_ist = datetime.now(ist)
+        
         new_result = {
-            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Timestamp": dt_ist.strftime("%Y-%m-%d %H:%M:%S"),
             "Email": email,
-            "Quiz_Score": score,
+            "Scored": int(score),
             "Pass_Fail": pass_fail
         }
         
@@ -492,7 +501,7 @@ def quiz_page():
             for i, result in enumerate(results):
                 st.write(f"Q{i+1}: {result}")
             
-            if save_quiz_result(st.session_state.user_email, f"{score}/{len(current_quiz)}", pass_fail):
+            if save_quiz_result(st.session_state.user_email, score, pass_fail):
                 st.success("Results saved successfully!")
 
 def admin_dashboard():
@@ -516,7 +525,7 @@ def admin_dashboard():
                 grid_data.append({
                     'Email': email,
                     'Status': '✅ Completed',
-                    'Score': row['Quiz_Score'],
+                    'Score': row['Scored'],
                     'Pass_Fail': row['Pass_Fail'],
                     'Timestamp': row['Timestamp']
                 })
@@ -569,43 +578,58 @@ def admin_dashboard():
                 student_result = results_df[results_df['Email'] == email] if not results_df.empty else pd.DataFrame()
                 if not student_result.empty:
                     row = student_result.iloc[-1]
-                    quiz_score_raw = str(row['Quiz_Score'])
-                    # Extract just the number before the slash (e.g., 7 from "7/10")
-                    if '/' in quiz_score_raw:
-                        score = int(quiz_score_raw.split('/')[0])
-                    else:
-                        score = 0
+                    # Score is now stored as integer
+                    score = int(row['Scored']) if pd.notna(row['Scored']) else 0
                     
-                    # Convert timestamp to IST
+                    # Timestamp is already stored in IST
                     timestamp_str = str(row['Timestamp'])
-                    try:
-                        dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-                        ist = timezone(timedelta(hours=5, minutes=30))
-                        dt_ist = dt.replace(tzinfo=timezone.utc).astimezone(ist)
-                        timestamp_ist = dt_ist.strftime("%Y-%m-%d %H:%M:%S IST")
-                    except:
-                        timestamp_ist = timestamp_str
+                    timestamp_ist = f"{timestamp_str} IST"
                     
                     export_data.append({
                         'Email': email,
-                        'Score': score,
+                        'Scored': score,
+                        'Total': 15,
                         'Pass_Fail': str(row['Pass_Fail']),
                         'Timestamp': timestamp_ist
                     })
                 else:
                     export_data.append({
                         'Email': email,
-                        'Score': 0,
+                        'Scored': 0,
+                        'Total': 15,
                         'Pass_Fail': 'Not Completed',
                         'Timestamp': 'Not Completed'
                     })
             
             export_df = pd.DataFrame(export_data)
             
-            # Create Excel file in memory
+            # Create Excel file in memory with proper formatting
+            from openpyxl.styles import Font, PatternFill, Alignment
+            from openpyxl.utils import get_column_letter
+            
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 export_df.to_excel(writer, index=False, sheet_name='Quiz Results')
+                workbook = writer.book
+                worksheet = writer.sheets['Quiz Results']
+                
+                # Format Score column as integer
+                for row_num, row in enumerate(worksheet.iter_rows(min_row=2, max_row=len(export_df)+1, min_col=3, max_col=3), 2):
+                    for cell in row:
+                        cell.number_format = '0'  # Integer format
+                
+                # Auto-adjust column widths
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = get_column_letter(column[0].column)
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(cell.value)
+                        except:
+                            pass
+                    worksheet.column_dimensions[column_letter].width = min(max_length + 2, 50)
+            
             output.seek(0)
             
             st.download_button(
