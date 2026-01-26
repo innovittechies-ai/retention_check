@@ -212,41 +212,106 @@ Transcript: {transcript}"""
         return None
 
 def login_page():
-    st.title("🔐 Quiz Login")
+    # Custom CSS for modern login design
+    st.markdown("""
+        <style>
+        .stApp {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            max-width: 400px;
+            margin: 100px auto;
+        }
+        .login-title {
+            text-align: center;
+            color: #333;
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 30px;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            justify-content: center;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 50px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            padding: 0 30px;
+            font-weight: 600;
+            color: #666;
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: #4a5568 !important;
+            color: white !important;
+        }
+        div[data-testid="stForm"] {
+            border: none;
+            padding: 0;
+        }
+        .stTextInput > div > div > input {
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+            padding: 12px;
+            font-size: 14px;
+        }
+        .stButton > button {
+            width: 100%;
+            background-color: #2d3748;
+            color: white;
+            border-radius: 10px;
+            padding: 12px;
+            font-weight: 600;
+            border: none;
+            margin-top: 20px;
+        }
+        .stButton > button:hover {
+            background-color: #1a202c;
+        }
+        </style>
+    """, unsafe_allow_html=True)
     
-    # Admin login
-    st.subheader("Admin Login")
-    with st.form("admin_login_form"):
-        admin_email = st.text_input("Admin Email")
-        admin_pass = st.text_input("Admin Password", type="password")
-        admin_submit = st.form_submit_button("🔑 Admin Login")
-        
-        if admin_submit:
-            if admin_email == ADMIN_EMAIL and admin_pass == ADMIN_PASSWORD:
-                st.session_state.logged_in = True
-                st.session_state.user_email = ADMIN_EMAIL
-                st.success("Admin login successful!")
-                st.rerun()
-            else:
-                st.error("Invalid admin credentials")
+    st.markdown('<div class="login-title">Sign In With</div>', unsafe_allow_html=True)
     
-    st.divider()
+    tab1, tab2 = st.tabs(["ADMIN", "STUDENT"])
     
-    # Student login
-    st.subheader("Student Login")
-    with st.form("student_login_form"):
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        submit = st.form_submit_button("Login")
-        
-        if submit:
-            if email in st.session_state.authorized_emails and password:
-                st.session_state.logged_in = True
-                st.session_state.user_email = email
-                st.success("Login successful!")
-                st.rerun()
-            else:
-                st.error("Invalid email or password")
+    with tab1:
+        with st.form("admin_login_form"):
+            st.text_input("Username", key="admin_username")
+            st.text_input("Password", type="password", key="admin_password")
+            admin_submit = st.form_submit_button("Sign In")
+            
+            if admin_submit:
+                admin_email = st.session_state.admin_username
+                admin_pass = st.session_state.admin_password
+                if admin_email == ADMIN_EMAIL and admin_pass == ADMIN_PASSWORD:
+                    st.session_state.logged_in = True
+                    st.session_state.user_email = ADMIN_EMAIL
+                    st.success("Admin login successful!")
+                    st.rerun()
+                else:
+                    st.error("Invalid admin credentials")
+    
+    with tab2:
+        with st.form("student_login_form"):
+            st.text_input("Username", key="student_username")
+            st.text_input("Password", type="password", key="student_password")
+            submit = st.form_submit_button("Sign In")
+            
+            if submit:
+                email = st.session_state.student_username
+                password = st.session_state.student_password
+                if email in st.session_state.authorized_emails and password:
+                    st.session_state.logged_in = True
+                    st.session_state.user_email = email
+                    st.success("Login successful!")
+                    st.rerun()
+                else:
+                    st.error("Invalid email or password")
 
 def quiz_page():
     if st.session_state.user_email == ADMIN_EMAIL:
