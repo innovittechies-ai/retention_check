@@ -175,28 +175,26 @@ def generate_quiz_with_gemini(transcript, api_key):
     
     prompt = f"""Based on this Python programming transcript, create exactly 15 multiple choice questions with the following distribution:
 - 5 simple questions (basic comprehension and fundamental concepts)
-- 5 moderate questions (application and deeper understanding)
+- 5 moderate questions (application and deeper understanding)  
 - 2 complex questions (analysis, problem-solving, and edge cases)
-- 3 code-related questions (practical coding scenarios with code snippets)
+- 3 code-related questions (practical coding scenarios - show actual Python code in questions)
 
-Requirements:
-1. All questions MUST be directly related to the transcript content
-2. For code-related questions, include actual Python code snippets in the question
-3. Code questions should test understanding of output, logic, or syntax
-4. Ensure options are plausible distractors, not obviously wrong
-5. Mix different Python concepts (variables, functions, loops, data structures, OOP, etc.)
+IMPORTANT: All questions must be directly from the transcript content.
 
-Format STRICTLY as JSON:
+Return ONLY valid JSON in this exact format:
 {{
   "questions": [
     {{
-      "question": "Question text (include code snippets for code-related questions within triple backticks)",
+      "question": "Question text here",
       "options": ["A) option1", "B) option2", "C) option3", "D) option4"],
       "correct": "A",
-      "difficulty": "simple|moderate|complex|code"
+      "difficulty": "simple"
     }}
   ]
 }}
+
+Use these difficulty levels: simple, moderate, complex, or code
+For code questions, include Python code directly in the question text.
 
 Transcript: {transcript}"""
 
@@ -688,6 +686,8 @@ def main():
         with col1:
             if os.path.exists("Logo Full.png"):
                 st.image("Logo Full.png", width=150)
+        with col2:
+            st.image("Logo Full.png", width=150)
         with col3:
             st.markdown(f"**{st.session_state.user_email}**")
             if st.button("🚪 Logout"):
