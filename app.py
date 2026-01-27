@@ -214,6 +214,19 @@ def get_quiz_data():
 def save_quiz_result(email, score, pass_fail):
     try:
         results = load_quiz_results()
+        history = load_quiz_history()
+        
+        # Get attempt count from history
+        attempt_count = 1
+        if email in history:
+            attempt_count = len(history[email]) + 1
+        
+        # Check if user already has a current result
+        for result in results:
+            if result.get("Email") == email:
+                attempt_count = result.get('Attempt_Count', 1) + 1
+                break
+        
         existing_index = None
         for i, result in enumerate(results):
             if result.get("Email") == email:
@@ -228,7 +241,8 @@ def save_quiz_result(email, score, pass_fail):
             "Timestamp": dt_ist.strftime("%Y-%m-%d %H:%M:%S"),
             "Email": email,
             "Scored": int(score),
-            "Pass_Fail": pass_fail
+            "Pass_Fail": pass_fail,
+            "Attempt_Count": attempt_count
         }
         
         if existing_index is not None:
@@ -655,10 +669,12 @@ def admin_dashboard():
                 row = student_result.iloc[-1]
                 # Handle both old and new column names
                 score = row.get('Scored') if 'Scored' in row.index else row.get('Quiz_Score', 0)
+                attempt_count = int(row.get('Attempt_Count', 1)) if 'Attempt_Count' in row.index else 1
                 grid_data.append({
                     'Email': email,
                     'Status': '✅ Completed',
                     'Score': score,
+                    'Attempt_Count': attempt_count,
                     'Pass_Fail': row['Pass_Fail'],
                     'Timestamp': row['Timestamp']
                 })
@@ -667,6 +683,7 @@ def admin_dashboard():
                     'Email': email,
                     'Status': '❌ Not Completed',
                     'Score': '-',
+                    'Attempt_Count': 0,
                     'Pass_Fail': '-',
                     'Timestamp': '-'
                 })
@@ -721,6 +738,8 @@ def admin_dashboard():
                         else:
                             score = int(score_val) if score_val else 0
                     
+                    attempt_count = int(row.get('Attempt_Count', 1)) if 'Attempt_Count' in row.index else 1
+                    
                     # Timestamp is already stored in IST
                     timestamp_str = str(row['Timestamp'])
                     timestamp_ist = f"{timestamp_str} IST"
@@ -728,6 +747,7 @@ def admin_dashboard():
                     export_data.append({
                         'Email': email,
                         'Score(15)': score,
+                        'Attempt_Count': attempt_count,
                         'Pass_Fail': str(row['Pass_Fail']),
                         'Timestamp': timestamp_ist
                     })
@@ -735,6 +755,7 @@ def admin_dashboard():
                     export_data.append({
                         'Email': email,
                         'Score(15)': 0,
+                        'Attempt_Count': 0,
                         'Pass_Fail': 'Not Completed',
                         'Timestamp': 'Not Completed'
                     })
