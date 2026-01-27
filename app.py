@@ -85,6 +85,7 @@ QUIZ_QUESTIONS = [
 QUIZ_FILE = "current_quiz.json"
 RESULTS_FILE = "quiz_results.json"
 AUTHORIZED_EMAILS_FILE = "authorized_emails.json"
+QUIZ_HISTORY_FILE = "quiz_history.json"
 
 def load_authorized_emails():
     if os.path.exists(AUTHORIZED_EMAILS_FILE):
@@ -149,6 +150,55 @@ def save_quiz_results(results):
             json.dump(results, f)
         return True
     except:
+        return False
+
+def load_quiz_history():
+    if os.path.exists(QUIZ_HISTORY_FILE):
+        try:
+            with open(QUIZ_HISTORY_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_quiz_history(history):
+    try:
+        with open(QUIZ_HISTORY_FILE, 'w') as f:
+            json.dump(history, f)
+        return True
+    except:
+        return False
+
+def backup_current_results():
+    """Backup current results before generating new quiz"""
+    try:
+        results = load_quiz_results()
+        if not results:
+            return True
+        
+        history = load_quiz_history()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Save to CSV backup
+        df = pd.DataFrame(results)
+        df.to_csv(f"quiz_backup_{timestamp}.csv", index=False)
+        
+        # Add to history for each user
+        for result in results:
+            email = result['Email']
+            if email not in history:
+                history[email] = []
+            history[email].append(result)
+        
+        save_quiz_history(history)
+        
+        # Clear current results
+        save_quiz_results([])
+        st.session_state.quiz_results = []
+        
+        return True
+    except Exception as e:
+        st.error(f"Backup failed: {e}")
         return False
 
 @st.cache_data
@@ -463,14 +513,18 @@ def quiz_page():
         transcript = st.text_area("Paste transcript to generate custom quiz:", height=150)
         
         if st.button("Generate Custom Quiz") and api_key and transcript:
-            with st.spinner("Generating quiz..."):
-                custom_quiz = generate_quiz_with_gemini(transcript, api_key)
-                if custom_quiz:
-                    if save_current_quiz(custom_quiz['questions']):
-                        st.success("Custom quiz generated! All students will now see this quiz.")
-                        st.rerun()
-                    else:
-                        st.error("Failed to save quiz")
+            with st.spinner("Backing up current results..."):
+                if backup_current_results():
+                    with st.spinner("Generating quiz..."):
+                        custom_quiz = generate_quiz_with_gemini(transcript, api_key)
+                        if custom_quiz:
+                            if save_current_quiz(custom_quiz['questions']):
+                                st.success("Custom quiz generated! Previous results backed up.")
+                                st.rerun()
+                            else:
+                                st.error("Failed to save quiz")
+                else:
+                    st.error("Failed to backup results")
         
         st.divider()
         st.info("💡 After generating a custom quiz, students will see the new questions when they take the quiz.")
@@ -517,6 +571,66 @@ def quiz_page():
             
             if save_quiz_result(st.session_state.user_email, score, pass_fail):
                 st.success("Results saved successfully!")
+
+def report_page():
+    st.header("📈 Quiz Reports")
+    
+    history = load_quiz_history()
+    current_results = load_quiz_results()
+    
+    # Merge current results into history for display
+    display_history = history.copy()
+    for result in current_results:
+        email = result['Email']
+        if email not in display_history:
+            display_history[email] = []
+        # Check if not already in history
+        if not any(r.get('Timestamp') == result.get('Timestamp') for r in display_history[email]):
+            display_history[email].append(result)
+    
+    if st.session_state.user_email == ADMIN_EMAIL:
+        # Admin sees all students
+        students = [e for e in st.session_state.authorized_emails if e != ADMIN_EMAIL]
+        selected_student = st.selectbox("Select Student", students)
+        email_to_show = selected_student
+    else:
+        # Student sees only their own
+        email_to_show = st.session_state.user_email
+    
+    if email_to_show in display_history and display_history[email_to_show]:
+        user_history = display_history[email_to_show]
+        
+        st.subheader(f"Report for: {email_to_show}")
+        st.metric("Total Quizzes Completed", len(user_history))
+        
+        # Create table data
+        quiz_names = [f"Quiz {i+1}" for i in range(len(user_history))]
+        dates = [r['Timestamp'].split()[0] for r in user_history]
+        scores = [int(r.get('Scored', 0)) for r in user_history]
+        totals = [15] * len(user_history)
+        averages = [f"{(s/15*100):.1f}%" for s in scores]
+        
+        report_df = pd.DataFrame({
+            'Quiz': quiz_names,
+            'Date': dates,
+            'Score': scores,
+            'From': totals,
+            'Average': averages,
+            'Status': [r['Pass_Fail'] for r in user_history]
+        })
+        
+        st.dataframe(report_df, use_container_width=True)
+        
+        # Summary stats
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Average Score", f"{sum(scores)/len(scores):.1f}/15")
+        with col2:
+            st.metric("Pass Rate", f"{len([r for r in user_history if r['Pass_Fail']=='Pass'])/len(user_history)*100:.0f}%")
+        with col3:
+            st.metric("Best Score", f"{max(scores)}/15")
+    else:
+        st.info(f"No quiz history found for {email_to_show}")
 
 def admin_dashboard():
     tab1, tab2 = st.tabs(["📊 Student Status", "👥 Manage Students"])
@@ -779,13 +893,19 @@ def main():
         st.divider()
         
         if st.session_state.user_email == ADMIN_EMAIL:
-            tab1, tab2 = st.tabs(["📝 Quiz Generation", "👨💼 Admin Dashboard"])
+            tab1, tab2, tab3 = st.tabs(["📝 Quiz Generation", "👨💼 Admin Dashboard", "📈 Reports"])
             with tab1:
                 quiz_page()
             with tab2:
                 admin_dashboard()
+            with tab3:
+                report_page()
         else:
-            quiz_page()
+            tab1, tab2 = st.tabs(["📝 Quiz", "📈 My Report"])
+            with tab1:
+                quiz_page()
+            with tab2:
+                report_page()
     else:
         login_page()
 
