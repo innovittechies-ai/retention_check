@@ -584,9 +584,8 @@ def report_page():
         email = result['Email']
         if email not in display_history:
             display_history[email] = []
-        # Check if not already in history
-        if not any(r.get('Timestamp') == result.get('Timestamp') for r in display_history[email]):
-            display_history[email].append(result)
+        # Add current result if not already in history
+        display_history[email].append(result)
     
     if st.session_state.user_email == ADMIN_EMAIL:
         # Admin sees all students
