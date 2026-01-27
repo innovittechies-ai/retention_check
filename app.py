@@ -591,8 +591,12 @@ def report_page():
     if st.session_state.user_email == ADMIN_EMAIL:
         # Admin sees all students
         students = [e for e in st.session_state.authorized_emails if e != ADMIN_EMAIL]
-        selected_student = st.selectbox("Select Student", students)
-        email_to_show = selected_student
+        if students:
+            selected_student = st.selectbox("Select Student", students)
+            email_to_show = selected_student
+        else:
+            st.warning("No students found. Add students in the 'Manage Students' tab.")
+            return
     else:
         # Student sees only their own
         email_to_show = st.session_state.user_email
