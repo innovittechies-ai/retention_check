@@ -273,6 +273,7 @@ IMPORTANT JSON RULES:
 3. Escape all special characters properly
 4. Keep all text on single lines
 5. Use simple quotes or describe code logic instead of actual code
+6. Include an "explanation" field for each question explaining why the correct answer is right and key concepts
 
 Format STRICTLY as valid JSON:
 {{
@@ -281,7 +282,8 @@ Format STRICTLY as valid JSON:
       "question": "Question text in plain English",
       "options": ["A) option1", "B) option2", "C) option3", "D) option4"],
       "correct": "A",
-      "difficulty": "easy"
+      "difficulty": "easy",
+      "explanation": "Brief explanation of why the correct answer is right and key concept to remember"
     }}
   ]
 }}
@@ -617,7 +619,8 @@ def quiz_page():
                         'question': q['question'],
                         'user_answer': user_choice,
                         'correct_answer': correct,
-                        'options': q['options']
+                        'options': q['options'],
+                        'explanation': q.get('explanation', 'No explanation available.')
                     })
             
             percentage = (score / len(current_quiz)) * 100
@@ -649,19 +652,14 @@ def quiz_page():
             st.divider()
             st.subheader("🤖 AI Tutor - Learn from Your Mistakes")
             
-            # Get API key from secrets or ask user
-            api_key = st.secrets.get("GEMINI_API_KEY", None)
-            
-            if not api_key:
-                api_key = st.text_input("Enter Google AI Studio API Key to get explanations:", type="password", key="student_api_key")
-            
-            if api_key:
-                if st.button("📚 Get Explanations for Wrong Answers"):
-                    with st.spinner("Generating explanations..."):
-                        explanation = explain_wrong_answers(st.session_state.quiz_wrong_questions, api_key)
-                        st.markdown(explanation)
-            else:
-                st.info("💡 Enter your Google AI Studio API Key above to get detailed explanations for your wrong answers.")
+            # Show explanations from quiz data
+            for i, wrong_q in enumerate(st.session_state.quiz_wrong_questions):
+                with st.expander(f"Question {i+1}: {wrong_q['question'][:50]}..."):
+                    st.write(f"**Your Answer:** {wrong_q['user_answer']}")
+                    st.write(f"**Correct Answer:** {wrong_q['correct_answer']}")
+                    st.write(f"**Explanation:**")
+                    explanation = wrong_q.get('explanation', 'No explanation available for this question.')
+                    st.info(explanation)
 
 def report_page():
     st.header("📈 Quiz Reports")
