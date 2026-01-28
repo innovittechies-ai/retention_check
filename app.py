@@ -259,7 +259,7 @@ def save_quiz_result(email, score, pass_fail):
         return False
 
 def generate_quiz_with_gemini(transcript, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}"
     
     prompt = f"""Based on this transcript, create exactly 15 multiple choice questions:
 - 4 easy questions (basic comprehension/discussion oriented)
@@ -317,6 +317,38 @@ Transcript: {transcript}"""
     else:
         st.error(f"Quiz generation failed: {response.text}")
         return None
+
+def explain_wrong_answers(wrong_questions, api_key):
+    """Generate explanations for wrong answers using Gemini AI"""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}"
+    
+    questions_text = "\n\n".join([
+        f"Question {i+1}: {q['question']}\nYour Answer: {q['user_answer']}\nCorrect Answer: {q['correct_answer']}\nOptions: {', '.join(q['options'])}"
+        for i, q in enumerate(wrong_questions)
+    ])
+    
+    prompt = f"""You are a helpful tutor. A student got these questions wrong in a quiz. 
+For each question, explain:
+1. Why the correct answer is right
+2. Why the student's answer was wrong
+3. Key concept to remember
+
+Keep explanations clear, concise, and educational.
+
+{questions_text}"""
+    
+    headers = {'Content-Type': 'application/json'}
+    data = {"contents": [{"parts": [{"text": prompt}]}]}
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            content = response.json()['candidates'][0]['content']['parts'][0]['text']
+            return content
+        else:
+            return "Unable to generate explanations at this time."
+    except:
+        return "Unable to generate explanations at this time."
 
 def login_page():
     # Load background image if exists
@@ -523,7 +555,7 @@ def quiz_page():
         st.write(f"Welcome, {st.session_state.user_email}!")
         
         st.header("Generate Custom Quiz")
-        api_key = st.text_input("Enter Google AI Studio API Key (optional):", type="password")
+        api_key = st.text_input("Enter Google AI Studio API Key (optional):", type="password", key="admin_api_key")
         transcript = st.text_area("Paste transcript to generate custom quiz:", height=150)
         
         if st.button("Generate Custom Quiz") and api_key and transcript:
@@ -562,6 +594,7 @@ def quiz_page():
         if submit_quiz:
             score = 0
             results = []
+            wrong_questions = []
             
             for i, q in enumerate(current_quiz):
                 correct = q['correct']
@@ -572,6 +605,12 @@ def quiz_page():
                     results.append("✅")
                 else:
                     results.append(f"❌ (Correct: {correct})")
+                    wrong_questions.append({
+                        'question': q['question'],
+                        'user_answer': user_choice,
+                        'correct_answer': correct,
+                        'options': q['options']
+                    })
             
             percentage = (score / len(current_quiz)) * 100
             pass_fail = "Pass" if percentage >= 70 else "Fail"
@@ -585,6 +624,25 @@ def quiz_page():
             
             if save_quiz_result(st.session_state.user_email, score, pass_fail):
                 st.success("Results saved successfully!")
+            
+            # Show AI explanation for wrong answers (only for students)
+            if st.session_state.user_email != ADMIN_EMAIL and wrong_questions:
+                st.divider()
+                st.subheader("🤖 AI Tutor - Learn from Your Mistakes")
+                
+                # Get API key from secrets or ask user
+                api_key = st.secrets.get("GEMINI_API_KEY", None)
+                
+                if not api_key:
+                    api_key = st.text_input("Enter Google AI Studio API Key to get explanations:", type="password", key="student_api_key")
+                
+                if api_key:
+                    if st.button("📚 Get Explanations for Wrong Answers"):
+                        with st.spinner("Generating explanations..."):
+                            explanation = explain_wrong_answers(wrong_questions, api_key)
+                            st.markdown(explanation)
+                else:
+                    st.info("💡 Enter your Google AI Studio API Key above to get detailed explanations for your wrong answers.")
 
 def report_page():
     st.header("📈 Quiz Reports")
