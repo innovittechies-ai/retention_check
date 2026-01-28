@@ -591,52 +591,62 @@ def quiz_page():
     if 'quiz_wrong_questions' not in st.session_state:
         st.session_state.quiz_wrong_questions = []
     
-    with st.form("quiz_form"):
-        user_answers = {}
-        
-        for i, q in enumerate(current_quiz):
-            st.subheader(f"Q{i+1}")
-            st.write(q['question'])
-            user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
-        
-        submit_quiz = st.form_submit_button("Submit Quiz")
-        
-        if submit_quiz:
-            score = 0
-            results = []
-            wrong_questions = []
+    # Reset results when starting a new quiz
+    if st.button("🔄 Start New Quiz"):
+        st.session_state.show_results = False
+        st.session_state.quiz_score = 0
+        st.session_state.quiz_wrong_questions = []
+        st.rerun()
+    
+    # Only show quiz form if results are not being displayed
+    if not st.session_state.show_results:
+        with st.form("quiz_form"):
+            user_answers = {}
             
             for i, q in enumerate(current_quiz):
-                correct = q['correct']
-                user_choice = user_answers[i][0]
+                st.subheader(f"Q{i+1}")
+                st.write(q['question'])
+                user_answers[i] = st.radio(f"Select answer for Q{i+1}:", q['options'], key=f"q_{i}")
+            
+            submit_quiz = st.form_submit_button("Submit Quiz")
+            
+            if submit_quiz:
+                score = 0
+                results = []
+                wrong_questions = []
                 
-                if user_choice == correct:
-                    score += 1
-                    results.append("✅")
-                else:
-                    results.append(f"❌ (Correct: {correct})")
-                    wrong_questions.append({
-                        'question': q['question'],
-                        'user_answer': user_choice,
-                        'correct_answer': correct,
-                        'options': q['options'],
-                        'explanation': q.get('explanation', 'No explanation available.')
-                    })
-            
-            percentage = (score / len(current_quiz)) * 100
-            pass_fail = "Pass" if percentage >= 70 else "Fail"
-            
-            # Store in session state
-            st.session_state.show_results = True
-            st.session_state.quiz_score = score
-            st.session_state.quiz_percentage = percentage
-            st.session_state.quiz_pass_fail = pass_fail
-            st.session_state.quiz_results = results
-            st.session_state.quiz_wrong_questions = wrong_questions
-            st.session_state.quiz_total = len(current_quiz)
-            
-            if save_quiz_result(st.session_state.user_email, score, pass_fail):
-                st.success("Results saved successfully!")
+                for i, q in enumerate(current_quiz):
+                    correct = q['correct']
+                    user_choice = user_answers[i][0]
+                    
+                    if user_choice == correct:
+                        score += 1
+                        results.append("✅")
+                    else:
+                        results.append(f"❌ (Correct: {correct})")
+                        wrong_questions.append({
+                            'question': q['question'],
+                            'user_answer': user_choice,
+                            'correct_answer': correct,
+                            'options': q['options'],
+                            'explanation': q.get('explanation', 'No explanation available.')
+                        })
+                
+                percentage = (score / len(current_quiz)) * 100
+                pass_fail = "Pass" if percentage >= 70 else "Fail"
+                
+                # Store in session state
+                st.session_state.show_results = True
+                st.session_state.quiz_score = score
+                st.session_state.quiz_percentage = percentage
+                st.session_state.quiz_pass_fail = pass_fail
+                st.session_state.quiz_results = results
+                st.session_state.quiz_wrong_questions = wrong_questions
+                st.session_state.quiz_total = len(current_quiz)
+                
+                if save_quiz_result(st.session_state.user_email, score, pass_fail):
+                    st.success("Results saved successfully!")
+                st.rerun()
     
     # Show results outside the form
     if st.session_state.show_results:
