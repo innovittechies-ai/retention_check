@@ -581,6 +581,14 @@ def quiz_page():
     current_quiz = load_current_quiz()
     st.header("Take Quiz")
     
+    # Initialize session state for quiz results
+    if 'show_results' not in st.session_state:
+        st.session_state.show_results = False
+    if 'quiz_score' not in st.session_state:
+        st.session_state.quiz_score = 0
+    if 'quiz_wrong_questions' not in st.session_state:
+        st.session_state.quiz_wrong_questions = []
+    
     with st.form("quiz_form"):
         user_answers = {}
         
@@ -615,34 +623,45 @@ def quiz_page():
             percentage = (score / len(current_quiz)) * 100
             pass_fail = "Pass" if percentage >= 70 else "Fail"
             
-            st.header("🎯 Results")
-            st.write(f"**Score: {score}/{len(current_quiz)} ({percentage:.1f}%)**")
-            st.write(f"**Status: {pass_fail}**")
-            
-            for i, result in enumerate(results):
-                st.write(f"Q{i+1}: {result}")
+            # Store in session state
+            st.session_state.show_results = True
+            st.session_state.quiz_score = score
+            st.session_state.quiz_percentage = percentage
+            st.session_state.quiz_pass_fail = pass_fail
+            st.session_state.quiz_results = results
+            st.session_state.quiz_wrong_questions = wrong_questions
+            st.session_state.quiz_total = len(current_quiz)
             
             if save_quiz_result(st.session_state.user_email, score, pass_fail):
                 st.success("Results saved successfully!")
+    
+    # Show results outside the form
+    if st.session_state.show_results:
+        st.header("🎯 Results")
+        st.write(f"**Score: {st.session_state.quiz_score}/{st.session_state.quiz_total} ({st.session_state.quiz_percentage:.1f}%)**")
+        st.write(f"**Status: {st.session_state.quiz_pass_fail}**")
+        
+        for i, result in enumerate(st.session_state.quiz_results):
+            st.write(f"Q{i+1}: {result}")
+        
+        # Show AI explanation for wrong answers (only for students)
+        if st.session_state.user_email != ADMIN_EMAIL and st.session_state.quiz_wrong_questions:
+            st.divider()
+            st.subheader("🤖 AI Tutor - Learn from Your Mistakes")
             
-            # Show AI explanation for wrong answers (only for students)
-            if st.session_state.user_email != ADMIN_EMAIL and wrong_questions:
-                st.divider()
-                st.subheader("🤖 AI Tutor - Learn from Your Mistakes")
-                
-                # Get API key from secrets or ask user
-                api_key = st.secrets.get("GEMINI_API_KEY", None)
-                
-                if not api_key:
-                    api_key = st.text_input("Enter Google AI Studio API Key to get explanations:", type="password", key="student_api_key")
-                
-                if api_key:
-                    if st.button("📚 Get Explanations for Wrong Answers"):
-                        with st.spinner("Generating explanations..."):
-                            explanation = explain_wrong_answers(wrong_questions, api_key)
-                            st.markdown(explanation)
-                else:
-                    st.info("💡 Enter your Google AI Studio API Key above to get detailed explanations for your wrong answers.")
+            # Get API key from secrets or ask user
+            api_key = st.secrets.get("GEMINI_API_KEY", None)
+            
+            if not api_key:
+                api_key = st.text_input("Enter Google AI Studio API Key to get explanations:", type="password", key="student_api_key")
+            
+            if api_key:
+                if st.button("📚 Get Explanations for Wrong Answers"):
+                    with st.spinner("Generating explanations..."):
+                        explanation = explain_wrong_answers(st.session_state.quiz_wrong_questions, api_key)
+                        st.markdown(explanation)
+            else:
+                st.info("💡 Enter your Google AI Studio API Key above to get detailed explanations for your wrong answers.")
 
 def report_page():
     st.header("📈 Quiz Reports")
