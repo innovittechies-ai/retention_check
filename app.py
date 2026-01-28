@@ -259,7 +259,7 @@ def save_quiz_result(email, score, pass_fail):
         return False
 
 def generate_quiz_with_gemini(transcript, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     prompt = f"""Based on this transcript, create exactly 15 multiple choice questions:
 - 4 easy questions (basic comprehension/discussion oriented)
@@ -322,7 +322,7 @@ Transcript: {transcript}"""
 
 def explain_wrong_answers(wrong_questions, api_key):
     """Generate explanations for wrong answers using Gemini AI"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     questions_text = "\n\n".join([
         f"Question {i+1}: {q['question']}\nYour Answer: {q['user_answer']}\nCorrect Answer: {q['correct_answer']}\nOptions: {', '.join(q['options'])}"
