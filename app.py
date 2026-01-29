@@ -6,6 +6,20 @@ import json
 import os
 import time
 import io
+from collections import defaultdict
+
+# Load environment variables from .env file if it exists
+def load_env_file():
+    env_file = '.env'
+    if os.path.exists(env_file):
+        with open(env_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+
+load_env_file()
 
 # Configuration
 if 'authorized_emails' not in st.session_state:
@@ -86,6 +100,215 @@ QUIZ_FILE = "current_quiz.json"
 RESULTS_FILE = "quiz_results.json"
 AUTHORIZED_EMAILS_FILE = "authorized_emails.json"
 QUIZ_HISTORY_FILE = "quiz_history.json"
+ATTENDANCE_CACHE_FILE = "attendance_cache.json"
+
+# Zoom API Functions
+def get_zoom_token(account_id, client_id, client_secret):
+    """Get Zoom OAuth token"""
+    url = "https://zoom.us/oauth/token"
+    data = {'grant_type': 'account_credentials', 'account_id': account_id}
+    try:
+        response = requests.post(url, data=data, auth=(client_id, client_secret), timeout=10)
+        if response.status_code == 200:
+            return response.json()['access_token']
+    except:
+        pass
+    return None
+
+def get_all_meetings_in_date_range(token, start_date, end_date):
+    """Get all meetings between start_date and end_date"""
+    headers = {'Authorization': f'Bearer {token}'}
+    all_meetings = []
+    
+    current_date = start_date
+    while current_date <= end_date:
+        date_str = current_date.strftime('%Y-%m-%d')
+        
+        # Method 1: Past meetings endpoint
+        past_meetings_url = "https://api.zoom.us/v2/users/me/meetings"
+        params = {'type': 'past', 'page_size': 300, 'from': date_str, 'to': date_str}
+        
+        try:
+            response = requests.get(past_meetings_url, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                meetings = response.json().get('meetings', [])
+                for meeting in meetings:
+                    meeting['date'] = date_str
+                    if meeting.get('id') not in [m.get('id') for m in all_meetings]:
+                        all_meetings.append(meeting)
+        except:
+            pass
+        
+        # Method 2: Report endpoint
+        report_meetings_url = "https://api.zoom.us/v2/report/users/me/meetings"
+        params = {'from': date_str, 'to': date_str, 'page_size': 300}
+        
+        try:
+            response = requests.get(report_meetings_url, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                meetings = response.json().get('meetings', [])
+                for meeting in meetings:
+                    meeting['date'] = date_str
+                    if meeting.get('id') not in [m.get('id') for m in all_meetings]:
+                        all_meetings.append(meeting)
+        except:
+            pass
+        
+        current_date += timedelta(days=1)
+    
+    return all_meetings
+
+def get_meeting_participants(token, meeting_id):
+    """Get participants for a specific meeting"""
+    headers = {'Authorization': f'Bearer {token}'}
+    all_participants = []
+    
+    # Try instances API first
+    instances_url = f"https://api.zoom.us/v2/past_meetings/{meeting_id}/instances"
+    try:
+        instances_response = requests.get(instances_url, headers=headers, timeout=10)
+        if instances_response.status_code == 200:
+            instances = instances_response.json().get('meetings', [])
+            
+            for instance in instances:
+                instance_uuid = instance.get('uuid')
+                participants_url = f"https://api.zoom.us/v2/report/meetings/{instance_uuid}/participants"
+                
+                next_page_token = None
+                while True:
+                    params = {'page_size': 300}
+                    if next_page_token:
+                        params['next_page_token'] = next_page_token
+                    
+                    try:
+                        participants_response = requests.get(participants_url, headers=headers, params=params, timeout=10)
+                        if participants_response.status_code == 200:
+                            participants_data = participants_response.json()
+                            participants = participants_data.get('participants', [])
+                            all_participants.extend(participants)
+                            
+                            next_page_token = participants_data.get('next_page_token')
+                            if not next_page_token:
+                                break
+                        else:
+                            break
+                    except:
+                        break
+    except:
+        pass
+    
+    # Fallback: Direct meeting report
+    if not all_participants:
+        direct_url = f"https://api.zoom.us/v2/report/meetings/{meeting_id}/participants"
+        next_page_token = None
+        
+        while True:
+            params = {'page_size': 300}
+            if next_page_token:
+                params['next_page_token'] = next_page_token
+            
+            try:
+                direct_response = requests.get(direct_url, headers=headers, params=params, timeout=10)
+                if direct_response.status_code == 200:
+                    participants_data = direct_response.json()
+                    participants = participants_data.get('participants', [])
+                    all_participants.extend(participants)
+                    
+                    next_page_token = participants_data.get('next_page_token')
+                    if not next_page_token:
+                        break
+                else:
+                    break
+            except:
+                break
+    
+    return all_participants
+
+def convert_to_ist(utc_time_str):
+    """Convert UTC time to IST"""
+    if not utc_time_str or utc_time_str == '':
+        return None
+    try:
+        utc_time = datetime.fromisoformat(utc_time_str.replace('Z', '+00:00'))
+        ist_time = utc_time + timedelta(hours=5, minutes=30)
+        return ist_time
+    except:
+        return None
+
+def fetch_attendance_data(account_id, client_id, client_secret, start_date, end_date, progress_callback=None):
+    """Fetch attendance data for date range"""
+    token = get_zoom_token(account_id, client_id, client_secret)
+    if not token:
+        return None, "Failed to authenticate with Zoom"
+    
+    # Get all meetings
+    if progress_callback:
+        progress_callback("Fetching meetings...")
+    
+    meetings = get_all_meetings_in_date_range(token, start_date, end_date)
+    
+    if not meetings:
+        return None, "No meetings found in date range"
+    
+    # Process each meeting
+    attendance_by_date = defaultdict(lambda: defaultdict(lambda: {'present': False, 'duration': 0, 'join_time': None, 'leave_time': None}))
+    
+    total_meetings = len(meetings)
+    for idx, meeting in enumerate(meetings):
+        if progress_callback:
+            progress_callback(f"Processing meeting {idx+1}/{total_meetings}: {meeting.get('topic', 'Unknown')[:30]}...")
+        
+        meeting_id = meeting.get('id')
+        meeting_date = meeting.get('date', meeting.get('start_time', '')[:10])
+        
+        participants = get_meeting_participants(token, meeting_id)
+        
+        for participant in participants:
+            email = participant.get('user_email', '').lower().strip()
+            if not email or email == '':
+                continue
+            
+            duration = participant.get('duration', 0)
+            join_time = convert_to_ist(participant.get('join_time', ''))
+            leave_time = convert_to_ist(participant.get('leave_time', ''))
+            
+            # Update attendance for this date and email
+            if duration > attendance_by_date[meeting_date][email]['duration']:
+                attendance_by_date[meeting_date][email]['duration'] = duration
+                attendance_by_date[meeting_date][email]['join_time'] = join_time
+                attendance_by_date[meeting_date][email]['leave_time'] = leave_time
+            
+            attendance_by_date[meeting_date][email]['present'] = True
+    
+    return attendance_by_date, None
+
+def load_attendance_cache():
+    """Load cached attendance data"""
+    if os.path.exists(ATTENDANCE_CACHE_FILE):
+        try:
+            with open(ATTENDANCE_CACHE_FILE, 'r') as f:
+                data = json.load(f)
+                # Convert string dates back to datetime for comparison
+                if 'last_updated' in data:
+                    data['last_updated'] = datetime.fromisoformat(data['last_updated'])
+                return data
+        except:
+            return None
+    return None
+
+def save_attendance_cache(data):
+    """Save attendance data to cache"""
+    try:
+        # Convert datetime to ISO format for JSON serialization
+        cache_data = {
+            'last_updated': datetime.now().isoformat(),
+            'data': data
+        }
+        with open(ATTENDANCE_CACHE_FILE, 'w') as f:
+            json.dump(cache_data, f)
+        return True
+    except:
+        return False
 
 def load_authorized_emails():
     if os.path.exists(AUTHORIZED_EMAILS_FILE):
@@ -734,6 +957,215 @@ def report_page():
     else:
         st.info(f"No quiz history found for {email_to_show}")
 
+def attendance_page():
+    """Attendance tracking page for students and admin"""
+    st.header("📅 Attendance Report")
+    
+    # Load Zoom credentials from secrets or env
+    try:
+        zoom_account_id = st.secrets.get("ZOOM_ACCOUNT_ID", os.getenv("ZOOM_ACCOUNT_ID"))
+        zoom_client_id = st.secrets.get("ZOOM_CLIENT_ID", os.getenv("ZOOM_CLIENT_ID"))
+        zoom_client_secret = st.secrets.get("ZOOM_CLIENT_SECRET", os.getenv("ZOOM_CLIENT_SECRET"))
+    except:
+        zoom_account_id = os.getenv("ZOOM_ACCOUNT_ID")
+        zoom_client_id = os.getenv("ZOOM_CLIENT_ID")
+        zoom_client_secret = os.getenv("ZOOM_CLIENT_SECRET")
+    
+    if not all([zoom_account_id, zoom_client_id, zoom_client_secret]):
+        st.error("⚠️ Zoom API credentials not configured. Please add them to secrets.toml or .env file")
+        st.code("""
+# Add to .streamlit/secrets.toml:
+ZOOM_ACCOUNT_ID = "your_account_id"
+ZOOM_CLIENT_ID = "your_client_id"
+ZOOM_CLIENT_SECRET = "your_client_secret"
+        """)
+        return
+    
+    # Date range: Jan 24, 2026 to today
+    start_date = datetime(2026, 1, 24)
+    end_date = datetime.now()
+    
+    st.info(f"📊 Tracking attendance from **{start_date.strftime('%B %d, %Y')}** to **{end_date.strftime('%B %d, %Y')}**")
+    
+    # Check cache
+    cache = load_attendance_cache()
+    should_refresh = False
+    
+    if cache and 'last_updated' in cache:
+        last_updated = cache['last_updated']
+        hours_since_update = (datetime.now() - last_updated).total_seconds() / 3600
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.caption(f"📍 Last updated: {last_updated.strftime('%Y-%m-%d %H:%M:%S IST')} ({hours_since_update:.1f} hours ago)")
+        with col2:
+            if st.button("🔄 Refresh Data", type="secondary"):
+                should_refresh = True
+    else:
+        should_refresh = True
+        st.warning("No cached data found. Fetching attendance data...")
+    
+    # Fetch or use cached data
+    if should_refresh or not cache:
+        progress_placeholder = st.empty()
+        
+        def update_progress(message):
+            progress_placeholder.info(f"⏳ {message}")
+        
+        with st.spinner("Fetching attendance data from Zoom..."):
+            attendance_data, error = fetch_attendance_data(
+                zoom_account_id, 
+                zoom_client_id, 
+                zoom_client_secret,
+                start_date,
+                end_date,
+                update_progress
+            )
+        
+        progress_placeholder.empty()
+        
+        if error:
+            st.error(f"❌ {error}")
+            return
+        
+        if attendance_data:
+            # Convert defaultdict to regular dict for JSON serialization
+            serializable_data = {}
+            for date, emails in attendance_data.items():
+                serializable_data[date] = {}
+                for email, info in emails.items():
+                    serializable_data[date][email] = {
+                        'present': info['present'],
+                        'duration': info['duration'],
+                        'join_time': info['join_time'].isoformat() if info['join_time'] else None,
+                        'leave_time': info['leave_time'].isoformat() if info['leave_time'] else None
+                    }
+            
+            save_attendance_cache(serializable_data)
+            st.success("✅ Attendance data fetched and cached successfully!")
+            cache = {'data': serializable_data, 'last_updated': datetime.now()}
+    
+    if not cache or 'data' not in cache:
+        st.warning("No attendance data available.")
+        return
+    
+    attendance_data = cache['data']
+    
+    # Determine which email to show
+    if st.session_state.user_email == ADMIN_EMAIL:
+        # Admin sees dropdown to select student
+        students = [e for e in st.session_state.authorized_emails if e != ADMIN_EMAIL]
+        if students:
+            email_to_show = st.selectbox("Select Student", students)
+        else:
+            st.warning("No students found. Add students in the 'Manage Students' tab.")
+            return
+    else:
+        # Student sees only their own
+        email_to_show = st.session_state.user_email
+    
+    st.subheader(f"📊 Attendance for: {email_to_show}")
+    
+    # Prepare attendance report
+    attendance_records = []
+    all_dates = sorted(attendance_data.keys())
+    
+    total_present = 0
+    total_duration_seconds = 0
+    
+    for date in all_dates:
+        date_data = attendance_data[date]
+        
+        if email_to_show.lower() in date_data:
+            student_data = date_data[email_to_show.lower()]
+            status = "Present" if student_data['present'] else "Absent"
+            duration_seconds = student_data['duration']
+            duration_minutes = duration_seconds // 60
+            
+            # Parse join/leave times
+            join_time = None
+            leave_time = None
+            session_time_minutes = 0
+            
+            if student_data.get('join_time'):
+                try:
+                    join_time = datetime.fromisoformat(student_data['join_time'])
+                except:
+                    pass
+            
+            if student_data.get('leave_time'):
+                try:
+                    leave_time = datetime.fromisoformat(student_data['leave_time'])
+                except:
+                    pass
+            
+            if join_time and leave_time:
+                session_time_minutes = int((leave_time - join_time).total_seconds() // 60)
+            
+            attendance_records.append({
+                'Date': date,
+                'Status': status,
+                'Active Time (min)': duration_minutes,
+                'Session Time (min)': session_time_minutes,
+                'Join Time': join_time.strftime('%H:%M:%S') if join_time else 'N/A',
+                'Leave Time': leave_time.strftime('%H:%M:%S') if leave_time else 'N/A'
+            })
+            
+            if status == "Present":
+                total_present += 1
+                total_duration_seconds += duration_seconds
+        else:
+            # No record for this date = Absent
+            attendance_records.append({
+                'Date': date,
+                'Status': 'Absent',
+                'Active Time (min)': 0,
+                'Session Time (min)': 0,
+                'Join Time': 'N/A',
+                'Leave Time': 'N/A'
+            })
+    
+    if not attendance_records:
+        st.info("No attendance records found for this student.")
+        return
+    
+    # Display metrics
+    total_days = len(all_dates)
+    attendance_rate = (total_present / total_days * 100) if total_days > 0 else 0
+    avg_duration = (total_duration_seconds // 60) // total_present if total_present > 0 else 0
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("📅 Total Days", total_days)
+    with col2:
+        st.metric("✅ Days Present", total_present)
+    with col3:
+        st.metric("📊 Attendance Rate", f"{attendance_rate:.1f}%")
+    with col4:
+        st.metric("⏱️ Avg Active Time", f"{avg_duration} min")
+    
+    # Display table
+    df = pd.DataFrame(attendance_records)
+    
+    # Style the dataframe
+    def highlight_status(row):
+        if row['Status'] == 'Present':
+            return ['background-color: #d4edda'] * len(row)
+        else:
+            return ['background-color: #f8d7da'] * len(row)
+    
+    styled_df = df.style.apply(highlight_status, axis=1)
+    st.dataframe(styled_df, use_container_width=True, height=400)
+    
+    # Download CSV
+    csv = df.to_csv(index=False)
+    st.download_button(
+        "📥 Download Attendance CSV",
+        data=csv,
+        file_name=f"attendance_{email_to_show.replace('@', '_')}_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv"
+    )
+
 def admin_dashboard():
     tab1, tab2 = st.tabs(["📊 Student Status", "👥 Manage Students"])
     
@@ -1002,19 +1434,23 @@ def main():
         st.divider()
         
         if st.session_state.user_email == ADMIN_EMAIL:
-            tab1, tab2, tab3 = st.tabs(["📝 Quiz Generation", "👨💼 Admin Dashboard", "📈 Reports"])
+            tab1, tab2, tab3, tab4 = st.tabs(["📝 Quiz Generation", "👨💼 Admin Dashboard", "📈 Reports", "📅 Attendance"])
             with tab1:
                 quiz_page()
             with tab2:
                 admin_dashboard()
             with tab3:
                 report_page()
+            with tab4:
+                attendance_page()
         else:
-            tab1, tab2 = st.tabs(["📝 Quiz", "📈 My Report"])
+            tab1, tab2, tab3 = st.tabs(["📝 Quiz", "📈 My Report", "📅 My Attendance"])
             with tab1:
                 quiz_page()
             with tab2:
                 report_page()
+            with tab3:
+                attendance_page()
     else:
         login_page()
 

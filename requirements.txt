@@ -2,3 +2,5 @@ streamlit
 pandas
 requests
 openpyxl
+python-dotenv==1.0.0
+plotly
