@@ -705,7 +705,7 @@ def login_page():
         # Left side - show background image
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         if bg_file and os.path.exists(bg_file):
-            st.image(bg_file, width=None)
+            st.image(bg_file)
         else:
             st.markdown("""
                 <div style='height: 100vh; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); 
