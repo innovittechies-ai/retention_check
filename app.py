@@ -705,7 +705,7 @@ def login_page():
         # Left side - show background image
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         if bg_file and os.path.exists(bg_file):
-            st.image(bg_file, use_container_width=True)
+            st.image(bg_file, width=None)
         else:
             st.markdown("""
                 <div style='height: 100vh; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); 
@@ -931,7 +931,7 @@ def report_page():
             'Status': [r['Pass_Fail'] for r in user_history]
         })
         
-        st.dataframe(report_df, use_container_width=True)
+        st.dataframe(report_df, width='stretch')
         
         # Summary stats
         col1, col2, col3 = st.columns(3)
@@ -1155,7 +1155,7 @@ ZOOM_CLIENT_SECRET = "your_zoom_client_secret"
             return ['background-color: #f8d7da'] * len(row)
     
     styled_df = df.style.apply(highlight_status, axis=1)
-    st.dataframe(styled_df, use_container_width=True, height=400)
+    st.dataframe(styled_df, width='stretch', height=400)
     
     # Download CSV
     csv = df.to_csv(index=False)
@@ -1199,13 +1199,17 @@ def admin_dashboard():
                 grid_data.append({
                     'Email': email,
                     'Status': '❌ Not Completed',
-                    'Score': '-',
+                    'Score': 0,
                     'Attempt_Count': 0,
-                    'Pass_Fail': '-',
+                    'Pass_Fail': 'Not Completed',
                     'Timestamp': '-'
                 })
         
         grid_df = pd.DataFrame(grid_data)
+        
+        # Ensure proper data types for Arrow compatibility
+        grid_df['Score'] = grid_df['Score'].astype(int)
+        grid_df['Attempt_Count'] = grid_df['Attempt_Count'].astype(int)
         
         def highlight_status(row):
             if row['Status'] == '✅ Completed':
