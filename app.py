@@ -8,19 +8,6 @@ import time
 import io
 from collections import defaultdict
 
-# Load environment variables from .env file if it exists
-def load_env_file():
-    env_file = '.env'
-    if os.path.exists(env_file):
-        with open(env_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    os.environ[key.strip()] = value.strip()
-
-load_env_file()
-
 # Configuration
 if 'authorized_emails' not in st.session_state:
     st.session_state.authorized_emails = ["testing@gmail.com"]
@@ -961,24 +948,37 @@ def attendance_page():
     """Attendance tracking page for students and admin"""
     st.header("📅 Attendance Report")
     
-    # Load Zoom credentials from secrets or env
+    # Load Zoom credentials from Streamlit secrets only (like admin credentials)
+    zoom_account_id = None
+    zoom_client_id = None
+    zoom_client_secret = None
+    
     try:
-        zoom_account_id = st.secrets.get("ZOOM_ACCOUNT_ID", os.getenv("ZOOM_ACCOUNT_ID"))
-        zoom_client_id = st.secrets.get("ZOOM_CLIENT_ID", os.getenv("ZOOM_CLIENT_ID"))
-        zoom_client_secret = st.secrets.get("ZOOM_CLIENT_SECRET", os.getenv("ZOOM_CLIENT_SECRET"))
-    except:
-        zoom_account_id = os.getenv("ZOOM_ACCOUNT_ID")
-        zoom_client_id = os.getenv("ZOOM_CLIENT_ID")
-        zoom_client_secret = os.getenv("ZOOM_CLIENT_SECRET")
+        zoom_account_id = st.secrets.get("ZOOM_ACCOUNT_ID")
+        zoom_client_id = st.secrets.get("ZOOM_CLIENT_ID")
+        zoom_client_secret = st.secrets.get("ZOOM_CLIENT_SECRET")
+    except Exception as e:
+        pass
     
     if not all([zoom_account_id, zoom_client_id, zoom_client_secret]):
-        st.error("⚠️ Zoom API credentials not configured. Please add them to secrets.toml or .env file")
-        st.code("""
-# Add to .streamlit/secrets.toml:
-ZOOM_ACCOUNT_ID = "your_account_id"
-ZOOM_CLIENT_ID = "your_client_id"
-ZOOM_CLIENT_SECRET = "your_client_secret"
+        st.error("⚠️ Zoom API credentials not configured in Streamlit Cloud Secrets")
+        st.info("""
+**📝 To configure Zoom credentials:**
+
+1. Go to your Streamlit Cloud dashboard
+2. Click on your app → **Settings** → **Secrets**
+3. Add these three credentials (same place where you added ADMIN_EMAIL and ADMIN_PASSWORD):
+
+```toml
+ZOOM_ACCOUNT_ID = "your_zoom_account_id"
+ZOOM_CLIENT_ID = "your_zoom_client_id"
+ZOOM_CLIENT_SECRET = "your_zoom_client_secret"
+```
+
+4. Save and reboot the app
         """)
+        
+        st.warning("🔒 **Security Note**: Never commit these credentials to Git. Keep them only in Streamlit Cloud Secrets.")
         return
     
     # Date range: Jan 24, 2026 to today
