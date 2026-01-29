@@ -8,6 +8,20 @@ import time
 import io
 from collections import defaultdict
 
+# Import database functions
+try:
+    from database import (
+        init_database, get_database_url,
+        save_quiz_results_db, load_quiz_results_db,
+        save_authorized_emails_db, load_authorized_emails_db,
+        save_quiz_history_db, load_quiz_history_db,
+        save_current_quiz_db, load_current_quiz_db,
+        save_attendance_cache_db, load_attendance_cache_db
+    )
+    DATABASE_AVAILABLE = True
+except ImportError:
+    DATABASE_AVAILABLE = False
+
 # Configuration
 if 'authorized_emails' not in st.session_state:
     st.session_state.authorized_emails = ["testing@gmail.com"]
@@ -271,6 +285,16 @@ def fetch_attendance_data(account_id, client_id, client_secret, start_date, end_
 
 def load_attendance_cache():
     """Load cached attendance data"""
+    # Try database first
+    if DATABASE_AVAILABLE and get_database_url():
+        cache = load_attendance_cache_db()
+        if cache:
+            # Ensure last_updated is datetime
+            if 'last_updated' in cache and isinstance(cache['last_updated'], str):
+                cache['last_updated'] = datetime.fromisoformat(cache['last_updated'])
+            return cache
+    
+    # Fallback to JSON file
     if os.path.exists(ATTENDANCE_CACHE_FILE):
         try:
             with open(ATTENDANCE_CACHE_FILE, 'r') as f:
@@ -285,6 +309,13 @@ def load_attendance_cache():
 
 def save_attendance_cache(data):
     """Save attendance data to cache"""
+    success = False
+    
+    # Save to database if available
+    if DATABASE_AVAILABLE and get_database_url():
+        success = save_attendance_cache_db(data)
+    
+    # Also save to JSON file as backup
     try:
         # Convert datetime to ISO format for JSON serialization
         cache_data = {
@@ -293,11 +324,20 @@ def save_attendance_cache(data):
         }
         with open(ATTENDANCE_CACHE_FILE, 'w') as f:
             json.dump(cache_data, f)
-        return True
+        success = True
     except:
-        return False
+        pass
+    
+    return success
 
 def load_authorized_emails():
+    # Try database first
+    if DATABASE_AVAILABLE and get_database_url():
+        emails = load_authorized_emails_db()
+        if emails:
+            return emails
+    
+    # Fallback to JSON file
     if os.path.exists(AUTHORIZED_EMAILS_FILE):
         try:
             with open(AUTHORIZED_EMAILS_FILE, 'r') as f:
@@ -307,14 +347,30 @@ def load_authorized_emails():
     return []
 
 def save_authorized_emails(emails):
+    success = False
+    
+    # Save to database if available
+    if DATABASE_AVAILABLE and get_database_url():
+        success = save_authorized_emails_db(emails)
+    
+    # Also save to JSON file as backup
     try:
         with open(AUTHORIZED_EMAILS_FILE, 'w') as f:
             json.dump(emails, f)
-        return True
+        success = True
     except:
-        return False
+        pass
+    
+    return success
 
 def load_current_quiz():
+    # Try database first
+    if DATABASE_AVAILABLE and get_database_url():
+        quiz = load_current_quiz_db()
+        if quiz:
+            return quiz
+    
+    # Fallback to JSON file
     if os.path.exists(QUIZ_FILE):
         try:
             with open(QUIZ_FILE, 'r') as f:
@@ -324,14 +380,30 @@ def load_current_quiz():
     return QUIZ_QUESTIONS
 
 def save_current_quiz(quiz_questions):
+    success = False
+    
+    # Save to database if available
+    if DATABASE_AVAILABLE and get_database_url():
+        success = save_current_quiz_db(quiz_questions)
+    
+    # Also save to JSON file as backup
     try:
         with open(QUIZ_FILE, 'w') as f:
             json.dump(quiz_questions, f)
-        return True
+        success = True
     except:
-        return False
+        pass
+    
+    return success
 
 def load_quiz_results():
+    # Try database first
+    if DATABASE_AVAILABLE and get_database_url():
+        results = load_quiz_results_db()
+        if results:
+            return results
+    
+    # Fallback to JSON file
     if os.path.exists(RESULTS_FILE):
         try:
             with open(RESULTS_FILE, 'r') as f:
@@ -355,14 +427,30 @@ def load_quiz_results():
     return []
 
 def save_quiz_results(results):
+    success = False
+    
+    # Save to database if available
+    if DATABASE_AVAILABLE and get_database_url():
+        success = save_quiz_results_db(results)
+    
+    # Also save to JSON file as backup
     try:
         with open(RESULTS_FILE, 'w') as f:
             json.dump(results, f)
-        return True
+        success = True
     except:
-        return False
+        pass
+    
+    return success
 
 def load_quiz_history():
+    # Try database first
+    if DATABASE_AVAILABLE and get_database_url():
+        history = load_quiz_history_db()
+        if history:
+            return history
+    
+    # Fallback to JSON file
     if os.path.exists(QUIZ_HISTORY_FILE):
         try:
             with open(QUIZ_HISTORY_FILE, 'r') as f:
@@ -372,12 +460,21 @@ def load_quiz_history():
     return {}
 
 def save_quiz_history(history):
+    success = False
+    
+    # Save to database if available
+    if DATABASE_AVAILABLE and get_database_url():
+        success = save_quiz_history_db(history)
+    
+    # Also save to JSON file as backup
     try:
         with open(QUIZ_HISTORY_FILE, 'w') as f:
             json.dump(history, f)
-        return True
+        success = True
     except:
-        return False
+        pass
+    
+    return success
 
 def backup_current_results():
     """Backup current results before generating new quiz"""
@@ -1395,6 +1492,10 @@ def main():
         page_icon="📝",
         layout="wide"
     )
+    
+    # Initialize database if available
+    if DATABASE_AVAILABLE and get_database_url():
+        init_database()
     
     # Custom CSS for logo in top left
     st.markdown("""
